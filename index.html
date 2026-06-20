@@ -1,11 +1,3 @@
-To fix the issues you experienced with the cloud responses and make Jarvis respond perfectly, we need to correct two critical things in the code:
-
-1. **The JSON Prompt Structure for `gpt-oss-20b**`: High-reasoning models like `openai/gpt-oss-20b` follow rigid rule-sets. If the prompt isn't perfectly structured, it can fail to output the clean JSON data your web app needs, causing the system to ignore the AI and trigger the generic local fallback answers instead.
-2. **Missing Code Cleanup Fix**: There was a small typographic mistake in the final block of the `sendJarvisCommand` function from our previous conversational updates (`finaly` instead of `finally`), which completely locked out browser scripts when an AI response was processed.
-
-The complete, corrected source code below resolves these issues. Replace the entire content of your **`index (69).html`** file with this version:
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,8 +26,8 @@ The complete, corrected source code below resolves these issues. Replace the ent
         let currentUser = null;
         let userDevicesList = []; 
 
-        // Active NVIDIA API Credentials
-        const NVIDIA_API_KEY = "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";
+        // ⚠️ PASTE YOUR GITHUB PERSONAL ACCESS TOKEN (PAT) HERE FOR FREE GPT-4o-MINI POWER
+        const GITHUB_FREE_TOKEN = "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";
 
         window.activeRoom = null;
         window.activeDevice = null;
@@ -214,7 +206,7 @@ The complete, corrected source code below resolves these issues. Replace the ent
             if (e.target === modal) modal.style.display = 'none';
         };
 
-        // ====================== ENHANCED GENERAL AI ASSISTANT ENGINE ======================
+        // ====================== GITHUB MODELS OPENAI VOICE ENGINE CORE ======================
         
         function jarvisSpeak(text) {
             return new Promise((resolve) => {
@@ -236,51 +228,53 @@ The complete, corrected source code below resolves these issues. Replace the ent
             });
         }
 
-        async function processWithNvidiaAI(text) {
-            if (userDevicesList.length === 0) return null;
+        async function processWithGitHubOpenAI(text) {
+            if (!GITHUB_FREE_TOKEN || GITHUB_FREE_TOKEN.includes("YOUR_GITHUB")) {
+                console.warn("GitHub PAT Token missing. Dropping to client-side fallback system matrix.");
+                return null;
+            }
 
             const currentDeviceContext = JSON.stringify(userDevicesList.map(d => ({ roomId: d.roomId, deviceId: d.deviceId })));
-            
             const now = new Date();
             const liveClockString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + " on " + now.toDateString();
 
-            const prompt = `You are Jarvis, a highly advanced general-purpose reasoning assistant like ChatGPT or Alexa. Address the user respectfully as "sir" or "ma'am" when communicating.
+            const prompt = `You are Jarvis, a highly advanced general-purpose reasoning assistant like Alexa. Always address the user respectfully as "sir".
 
-Current Date and Clock Time: ${liveClockString}
-Available Smart Home Hardware Configurations: ${currentDeviceContext}
+Current Date and Clock Time Context: ${liveClockString}
+Available Smart Home Hardware Nodes: ${currentDeviceContext}
 User Voice/Text Input: "${text}"
 
-Your operational constraints:
-1. Identify if the user is asking a general conversation query (e.g., "what is the time now", "cricket updates", "how are you", "tell me a joke") or commanding a hardware appliance toggle.
-2. If it is a GENERAL KNOWLEDGE / CONVERSATION / TIME STATEMENT:
+Your Instructions:
+1. Determine if the user is asking a general conversation query (e.g., "what is the time now", "cricket updates", "how are you", "tell me a joke") or commanding a hardware appliance toggle.
+2. If it is a GENERAL KNOWLEDGE / CONVERSATION / TIME ENQUIRY:
    - Set "is_smart_home" to false.
    - Set "needs_clarification" to false.
-   - Write your natural response directly inside "reply_text". Use the context provided above to tell the exact current time if asked. Keep replies concise and ready to be read aloud.
+   - Provide a natural response directly inside "reply_text". Use the context provided above to tell the exact current time if asked. Keep replies concise and ready to be spoken out loud.
 3. If it is a SMART HOME COMMAND:
    - Set "is_smart_home" to true.
    - If missing target location context names, set "needs_clarification" to true and ask for the missing details in "reply_text".
    - If complete, map the updates to the "commands" array (actions: "bulb1"-"bulb4" or "fanSpeed" 0-3). Confirm respectfully in "reply_text" (e.g., "Yes sir, setting chintubedroom fan speed to low.").
 
-Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quotes:
+Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks, backticks, or quotes:
 {
   "is_smart_home": false,
   "needs_clarification": false,
-  "reply_text": "The current time is exactly 03:45 PM, sir.",
+  "reply_text": "The current time is exactly 04:15 PM, sir.",
   "commands": []
 }`;
 
             try {
-                const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                // Utilizing GitHub's Azure free proxy endpoint for official GPT-4o-mini access
+                const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${NVIDIA_API_KEY}`
+                        'Authorization': `Bearer ${GITHUB_FREE_TOKEN}`
                     },
                     body: JSON.stringify({
-                        model: "openai/gpt-oss-20b", 
+                        model: "gpt-4o-mini", 
                         messages: [{ role: "user", content: prompt }],
-                        temperature: 0.2,
-                        max_tokens: 400
+                        temperature: 0.3
                     })
                 });
                 
@@ -294,11 +288,12 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
                 
                 return JSON.parse(txt.substring(firstBracket, lastBracket + 1));
             } catch(e) {
-                console.error("NVIDIA API connection error caught: ", e);
+                console.error("CORS proxy constraint intercepted, falling back onto local engine matrix safely: ", e);
                 return null; 
             }
         }
 
+        // CLIENT-SIDE LOCAL BACKUP MATRIX (Guarantees Alexa replies even without keys or connection)
         function processWithLocalFallback(text) {
             const norm = text.toLowerCase().trim();
             const now = new Date();
@@ -316,7 +311,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
                 return {
                     "is_smart_home": false,
                     "needs_clarification": false,
-                    "reply_text": "Checking the central sports updates, sir. The matches are currently underway. For real-time ball-by-ball commentary data, please ensure the live tracking widget is fully enabled.",
+                    "reply_text": "Checking live sports tracking feeds, sir. Matches are currently underway. For ball-by-ball commentary data, please ensure the external sports widget dashboard is fully configured.",
                     "commands": []
                 };
             }
@@ -332,7 +327,15 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
                 return {
                     "is_smart_home": false,
                     "needs_clarification": false,
-                    "reply_text": "Hello sir. Central systems are stable. Ready for your instructions.",
+                    "reply_text": "Hello sir. Central systems are stable. Ready for your next command sequence.",
+                    "commands": []
+                };
+            }
+            if (norm.includes("joke")) {
+                return {
+                    "is_smart_home": false,
+                    "needs_clarification": false,
+                    "reply_text": "Certainly sir. Why did the smart light bulb fail its school exams? Because it wasn't very bright!",
                     "commands": []
                 };
             }
@@ -352,33 +355,38 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
             
             if (norm.includes("bulb") || norm.includes("light") || norm.includes("fan")) {
                 let targetActions = [];
+                let phraseDetail = "";
+
                 if (norm.includes("all") || (norm.includes("bulb") && !/\d/.test(norm))) {
                     targetActions.push({ action: "bulb1", value: isOnAction });
                     targetActions.push({ action: "bulb2", value: isOnAction });
                     targetActions.push({ action: "bulb3", value: isOnAction });
                     targetActions.push({ action: "bulb4", value: isOnAction });
+                    phraseDetail = `all bulbs`;
                 } else {
-                    if (norm.includes("bulb 1") || norm.includes("bulb1")) targetActions.push({ action: "bulb1", value: isOnAction });
-                    if (norm.includes("bulb 2") || norm.includes("bulb2")) targetActions.push({ action: "bulb2", value: isOnAction });
-                    if (norm.includes("bulb 3") || norm.includes("bulb3")) targetActions.push({ action: "bulb3", value: isOnAction });
-                    if (norm.includes("bulb 4") || norm.includes("bulb4")) targetActions.push({ action: "bulb4", value: isOnAction });
+                    if (norm.includes("bulb 1") || norm.includes("bulb1")) { targetActions.push({ action: "bulb1", value: isOnAction }); phraseDetail = "bulb 1"; }
+                    if (norm.includes("bulb 2") || norm.includes("bulb2")) { targetActions.push({ action: "bulb2", value: isOnAction }); phraseDetail = "bulb 2"; }
+                    if (norm.includes("bulb 3") || norm.includes("bulb3")) { targetActions.push({ action: "bulb3", value: isOnAction }); phraseDetail = "bulb 3"; }
+                    if (norm.includes("bulb 4") || norm.includes("bulb4")) { targetActions.push({ action: "bulb4", value: isOnAction }); phraseDetail = "bulb 4"; }
                 }
 
                 if (norm.includes("fan")) {
                     let fanVal = 0;
-                    if (isOffAction) fanVal = 0;
-                    else if (norm.includes("low") || norm.includes("speed 1")) fanVal = 1;
-                    else if (norm.includes("medium") || norm.includes("med") || norm.includes("speed 2")) fanVal = 2;
-                    else if (norm.includes("high") || norm.includes("speed 3")) fanVal = 3;
-                    else if (isOnAction) fanVal = 1;
+                    let speedText = "off";
+                    if (isOffAction) { fanVal = 0; speedText = "off"; }
+                    else if (norm.includes("low") || norm.includes("speed 1")) { fanVal = 1; speedText = "low"; }
+                    else if (norm.includes("medium") || norm.includes("med") || norm.includes("speed 2")) { fanVal = 2; speedText = "medium"; }
+                    else if (norm.includes("high") || norm.includes("speed 3")) { fanVal = 3; speedText = "high"; }
+                    else if (isOnAction) { fanVal = 1; speedText = "low"; }
                     targetActions.push({ action: "fanSpeed", value: fanVal });
+                    phraseDetail = `fan speed to ${speedText}`;
                 }
 
                 if (targetActions.length > 0) {
                     return {
                         "is_smart_home": true,
                         "needs_clarification": !foundExplicitly && userDevicesList.length > 1,
-                        "reply_text": !foundExplicitly && userDevicesList.length > 1 ? "Which room node should I execute that on, sir?" : `Yes sir, updating appliance switches immediately.`,
+                        "reply_text": !foundExplicitly && userDevicesList.length > 1 ? "Which room node should I execute that on, sir?" : `Yes sir, changed ${phraseDetail} successfully.`,
                         "commands": targetActions.map(act => ({
                             room: targetDevice.roomId,
                             device: targetDevice.deviceId,
@@ -392,7 +400,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
             return {
                 "is_smart_home": false,
                 "needs_clarification": false,
-                "reply_text": "I am standing by, sir. Let me know if you want to alter a smart appliance state or have a general conversational question.",
+                "reply_text": "I am online and listening, sir. Let me know if you want to alter a smart appliance state or have a general conversational question.",
                 "commands": []
             };
         }
@@ -406,7 +414,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
             input.placeholder = "Jarvis is processing...";
 
             try {
-                let result = await processWithNvidiaAI(text);
+                let result = await processWithGitHubOpenAI(text);
                 if (!result) {
                     result = processWithLocalFallback(text);
                 }
@@ -665,7 +673,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
 </head>
 <body>
 <div class="container">
-    <!-- AUTHENTICATION -->
     <div class="auth-container" id="auth-container">
         <div class="header">
             <h1>Smart Home</h1>
@@ -688,7 +695,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
         </div>
     </div>
 
-    <!-- UTILITY CONTROL SYSTEM -->
     <div class="app-container" id="app-container" style="display:none;">
         <div class="app-header">
             <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
@@ -723,7 +729,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
     </div>
 </div>
 
-<!-- Modal Dialog -->
 <div id="modal">
     <div class="modal-content">
         <h2>Add New Smart Node</h2>
@@ -734,7 +739,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
     </div>
 </div>
 
-<!-- ====================== FLOATING WIZARD STRUCTURE ELEMENT MAP ====================== -->
 <div class="jarvis-wizard-wrapper" id="jarvis-wizard-container">
     <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)" title="Drag to move / Click to setup commands">🤖</div>
     
@@ -758,5 +762,3 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
 
 </body>
 </html>
-
-```
