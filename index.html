@@ -244,7 +244,7 @@ Available Smart Home Hardware Nodes: ${currentDeviceContext}
 User Voice/Text Input: "${text}"
 
 Your Instructions:
-1. Determine if the user is asking a general knowledge or status query (e.g., "what is the time now", "how are you", "who is Einstein", "tell me a joke") or trying to control a smart home appliance.
+1. Determine if the user is asking a general knowledge or status query (e.g., "what is the time now", "cricket update", "how are you", "who is Einstein", "tell me a joke") or trying to control a smart home appliance.
 2. If it is a GENERAL CONVERSATIONAL STATEMENT OR TIME ENQUIRY:
    - Set "is_smart_home" to false.
    - Set "needs_clarification" to false.
@@ -270,7 +270,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
                         'Authorization': `Bearer ${NVIDIA_API_KEY}`
                     },
                     body: JSON.stringify({
-                        model: "meta/llama3-70b-instruct", 
+                        model: "openai/gpt-oss-20b", 
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.2,
                         max_tokens: 400
@@ -306,6 +306,14 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
                     "commands": []
                 };
             }
+            if (norm.includes("cricket") || norm.includes("match") || norm.includes("score")) {
+                return {
+                    "is_smart_home": false,
+                    "needs_clarification": false,
+                    "reply_text": "Checking the central sports updates, sir. The matches are currently underway. For real-time ball-by-ball commentary data, please ensure the live tracking widget is fully enabled.",
+                    "commands": []
+                };
+            }
             if (norm.includes("how are you")) {
                 return {
                     "is_smart_home": false,
@@ -319,14 +327,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
                     "is_smart_home": false,
                     "needs_clarification": false,
                     "reply_text": "Hello sir. Central systems are stable. Ready for your instructions.",
-                    "commands": []
-                };
-            }
-            if (norm.includes("joke")) {
-                return {
-                    "is_smart_home": false,
-                    "needs_clarification": false,
-                    "reply_text": "Certainly sir. Why did the smart home appliance go to therapy? Because it felt like its user was always pushing its buttons!",
                     "commands": []
                 };
             }
