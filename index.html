@@ -28,26 +28,29 @@
 
         window.activeRoom = null;
         window.activeDevice = null;
+        
+        let alwaysOnListeningActive = false;
+        let speechRecognitionInstance = null;
 
-        // Auth State Tracking
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
                 document.getElementById('user-name').textContent = user.email.split('@')[0];
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
-                document.getElementById('jarvis-bar-container').style.display = 'flex';
+                document.getElementById('jarvis-widget-toggle').style.display = 'flex';
                 loadUserDevices();
             } else {
                 currentUser = null;
                 userDevicesList = [];
+                window.stopAlwaysOnListening();
                 document.getElementById('auth-container').style.display = 'block';
                 document.getElementById('app-container').style.display = 'none';
-                document.getElementById('jarvis-bar-container').style.display = 'none';
+                document.getElementById('jarvis-widget-toggle').style.display = 'none';
+                document.getElementById('jarvis-floating-panel').classList.remove('open');
             }
         });
 
-        // Login & Signup Management
         window.login = async () => {
             const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
@@ -73,7 +76,11 @@
             }
         };
 
-        window.logout = () => signOut(auth);
+        window.logout = () => {
+            window.stopAlwaysOnListening();
+            signOut(auth);
+        };
+        
         window.showLogin = () => { document.getElementById('login-form').style.display = 'block'; document.getElementById('signup-form').style.display = 'none'; };
         window.showSignup = () => { document.getElementById('login-form').style.display = 'none'; document.getElementById('signup-form').style.display = 'block'; };
 
@@ -84,7 +91,6 @@
             setTimeout(() => el.style.display = 'none', 4000);
         }
 
-        // Load User Devices from Database
         function loadUserDevices() {
             const devicesRef = ref(db, `users/${currentUser.uid}/devices`);
             onValue(devicesRef, (snapshot) => {
@@ -200,7 +206,7 @@
             if (e.target === modal) modal.style.display = 'none';
         };
 
-        // ====================== HYBRID SMART JARVIS PROCESSING LOOP ======================
+        // ====================== NVIDIA MODEL CONNECTOR ======================
         async function processWithNvidiaAI(text) {
             if (userDevicesList.length === 0) return null;
 
@@ -212,7 +218,7 @@ User command: "${text}"
 Rules:
 1. Identify target room and device. If same name (like chintubedroom), match both.
 2. Actions: "bulb1"-"bulb4" (true/false) or "fanSpeed" (0-3).
-Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quotes:
+Return ONLY clean raw minified JSON:
 {"commands": [{"room": "chintubedroom", "device": "chintubedroom", "action": "bulb1", "value": true}]}`;
 
             try {
@@ -223,7 +229,7 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                         'Authorization': 'Bearer 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' 
                     },
                     body: JSON.stringify({
-                        model: "meta/llama3-70b-instruct", 
+                        model: "meta/llama-3.3-70b-instruct", 
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.1,
                         max_tokens: 200
@@ -240,11 +246,10 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                 
                 return JSON.parse(txt.substring(firstBracket, lastBracket + 1));
             } catch(e) {
-                return null; // Gracefully route down to local system regex engine
+                return null; 
             }
         }
 
-        // LOCAL AUTONOMOUS PARSER: Works instantaneously without needing any active web keys!
         function processWithLocalFallback(text) {
             const norm = text.toLowerCase().trim();
             let action = "bulb1";
@@ -263,7 +268,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                 else value = 1;
             }
 
-            // Target search matching
             let targetDevice = userDevicesList[0]; 
             for (let dev of userDevicesList) {
                 if (norm.includes(dev.roomId.toLowerCase()) || norm.includes(dev.deviceId.toLowerCase())) {
@@ -279,17 +283,16 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
             };
         }
 
-        window.sendJarvisCommand = async () => {
+        window.sendJarvisCommand = async (forcedText) => {
             const input = document.getElementById('jarvis-input');
-            const text = input.value.trim();
+            const text = forcedText ? forcedText.trim() : input.value.trim();
             if(!text) return;
             
             input.disabled = true;
-            input.placeholder = "Jarvis processing instruction fields...";
+            input.placeholder = "Jarvis processing fields...";
 
             try {
                 let result = await processWithNvidiaAI(text);
-                
                 if (!result) {
                     result = processWithLocalFallback(text);
                 }
@@ -301,7 +304,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                             d.deviceId.toLowerCase().trim() === cmd.device.toLowerCase().trim()
                         );
 
-                        // If explicit room lookup returns empty, direct switch onto the user's primary active profile index item card
                         const target = matchedDevice || userDevicesList[0];
                         if (!target) return;
 
@@ -312,53 +314,96 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                             set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/fanSpeed`), parseInt(cmd.value, 10) || 0);
                         }
                     });
-                    input.value = '';
-                } else {
-                    alert("Jarvis could not match that item configuration layout phrase context. Try adding a device target first.");
+                    if(!forcedText) input.value = '';
                 }
             } catch (err) {
                 console.error(err);
             } finally {
-                // Crucial Reset Core fix: This line runs no matter what to prevent input lockouts!
                 input.disabled = false;
-                input.placeholder = "Talk to Jarvis... e.g. Turn on bulb 1 in chintubedroom";
-                input.focus();
+                input.placeholder = alwaysOnListeningActive ? "🤖 ALWAYS LISTENING..." : "Talk to Jarvis...";
             }
         };
 
-        window.startVoiceInput = () => {
+        // ====================== FLOATING WIDGET WEB INTERACTIONS ======================
+        window.toggleJarvisWidget = () => {
+            const panel = document.getElementById('jarvis-floating-panel');
+            panel.classList.toggle('open');
+        };
+
+        window.toggleAlwaysOnListening = () => {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if(!SpeechRecognition) return alert("Web Speech platform drivers not accessible.");
+            if(!SpeechRecognition) return alert("Speech Recognition not supported.");
+
+            const toggleBtn = document.getElementById("always-on-toggle-btn");
+            const micStatusIndicator = document.getElementById("always-on-status-indicator");
+
+            if (alwaysOnListeningActive) {
+                window.stopAlwaysOnListening();
+                return;
+            }
+
+            alwaysOnListeningActive = true;
+            toggleBtn.textContent = "🛑 STOP ALWAYS ON";
+            toggleBtn.style.background = "#e74c3c";
+            micStatusIndicator.className = "mic-indicator listening";
+            micStatusIndicator.textContent = "Voice Active: ON";
+
+            speechRecognitionInstance = new SpeechRecognition();
+            speechRecognitionInstance.lang = 'en-US';
+            speechRecognitionInstance.interimResults = false;
+
+            speechRecognitionInstance.onstart = () => {
+                document.getElementById('jarvis-input').placeholder = "🤖 ALWAYS LISTENING...";
+            };
+
+            speechRecognitionInstance.onresult = e => {
+                const transcript = e.results[0][0].transcript;
+                document.getElementById('jarvis-input').value = transcript;
+                window.sendJarvisCommand(transcript);
+            };
+
+            speechRecognitionInstance.onend = () => {
+                if (alwaysOnListeningActive) speechRecognitionInstance.start();
+            };
+
+            speechRecognitionInstance.start();
+        };
+
+        window.stopAlwaysOnListening = () => {
+            alwaysOnListeningActive = false;
+            if(speechRecognitionInstance) { try { speechRecognitionInstance.stop(); } catch(e){} }
+            
+            const toggleBtn = document.getElementById("always-on-toggle-btn");
+            const micStatusIndicator = document.getElementById("always-on-status-indicator");
+            
+            if(toggleBtn) { toggleBtn.textContent = "🎙️ START ALWAYS ON LISTENING"; toggleBtn.style.background = "#2ecc71"; }
+            if(micStatusIndicator) { micStatusIndicator.className = "mic-indicator halted"; micStatusIndicator.textContent = "Voice Active: OFF"; }
+            
+            const inputField = document.getElementById('jarvis-input');
+            if(inputField) inputField.placeholder = "Talk to Jarvis...";
+        };
+        
+        window.startVoiceInput = () => {
+            if(alwaysOnListeningActive) return;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SpeechRecognition) return;
             
             const recog = new SpeechRecognition();
             recog.lang = 'en-US';
-            
             const micBtn = document.querySelector(".jarvis-bar button[title='Voice Input']");
             
-            recog.onstart = () => {
-                micBtn.style.background = "#e74c3c"; 
-                document.getElementById('jarvis-input').placeholder = "Listening... speak now.";
-            };
-
-            recog.onerror = () => { resetMicUI(); };
-            recog.onend = () => { resetMicUI(); };
-
+            recog.onstart = () => { micBtn.style.background = "#e74c3c"; };
+            recog.onend = () => { micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; };
             recog.onresult = e => {
                 document.getElementById('jarvis-input').value = e.results[0][0].transcript;
-                sendJarvisCommand();
+                window.sendJarvisCommand(e.results[0][0].transcript);
             };
-
-            function resetMicUI() {
-                micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)";
-                document.getElementById('jarvis-input').placeholder = "Talk to Jarvis... e.g. Turn on bulb 1 in chintubedroom";
-            }
-
             recog.start();
         };
     </script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:Arial,sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; padding-bottom: 120px; }
+        body { font-family:Arial,sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
         .container { width:100%; max-width:1200px; }
         .auth-container { background:white; border-radius:20px; box-shadow:0 20px 40px rgba(0,0,0,0.15); overflow:hidden; max-width:400px; margin:0 auto; }
         .header { background:linear-gradient(135deg,#2c3e50,#34495e); color:white; padding:40px 30px; text-align:center; }
@@ -370,7 +415,7 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
         .switch-form { margin-top: 15px; text-align: center; font-size: 0.95em; }
         .switch-form a { color:#667eea; cursor:pointer; text-decoration:underline; }
         .error-message { background:#f8d7da; color:#721c24; padding:12px; border-radius:8px; margin-bottom:15px; text-align:center; display:none; }
-        .app-container { background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; }
+        .app-container { background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; margin-bottom: 20px; }
         .app-header { background:linear-gradient(135deg,#2c3e50,#34495e); color:white; padding:20px 30px; display:flex; justify-content:space-between; align-items:center; }
         .logout-btn { background:#e74c3c; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; font-weight: bold; }
         .controls { padding:30px; }
@@ -398,42 +443,113 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:2000; }
         .modal-content { background:white; padding:35px; border-radius:15px; width:90%; max-width:420px; text-align:center; }
         
-        .jarvis-bar {
+        /* 📱 MOBILE COMFORTABLE FLOATING WIDGET TAB STYLES */
+        .jarvis-widget-launcher {
             position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(44, 62, 80, 0.98);
-            padding: 12px 20px;
-            border-radius: 50px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            bottom: 25px;
+            right: 25px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #00f2fe, #4facfe);
+            border-radius: 50%;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
             display: none;
+            justify-content: center;
             align-items: center;
-            gap: 10px;
-            z-index: 1000;
-            width: 90%;
-            max-width: 700px;
+            font-size: 1.8rem;
+            color: white;
+            cursor: pointer;
+            z-index: 9999;
+            border: 2px solid white;
+            transition: 0.3s transform;
+        }
+        .jarvis-widget-launcher:active { transform: scale(0.9); }
+
+        .jarvis-floating-card {
+            position: fixed;
+            bottom: 100px;
+            right: 25px;
+            width: 350px;
+            max-width: calc(100vw - 50px);
+            background: #2c3e50;
+            border-radius: 20px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.4);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 9998;
             border: 1px solid rgba(255,255,255,0.1);
+            transform: translateY(40px) scale(0.8);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .jarvis-floating-card.open {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+        }
+        .widget-header h3 { color: #00f2fe; font-size: 1.1rem; display: flex; align-items: center; gap: 6px; }
+        .widget-close { background: none; border: none; color: #bdc3c7; font-size: 1.2rem; cursor: pointer; padding: 4px; }
+
+        .mic-indicator {
+            align-self: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+        }
+        .mic-indicator.halted { background: #7f8c8d; }
+        .mic-indicator.listening { background: #2ecc71; animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0.5; } }
+        
+        .always-on-panel-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: white;
+            cursor: pointer;
+            background: #2ecc71;
+            transition: 0.2s;
+        }
+        .jarvis-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #1a252f;
+            padding: 8px 12px;
+            border-radius: 30px;
         }
         .jarvis-bar input {
             flex: 1;
-            padding: 14px 20px;
+            padding: 10px;
             border: none;
-            border-radius: 50px;
-            background: #1a252f;
+            background: transparent;
             color: white;
-            font-size: 1.05rem;
+            font-size: 0.95rem;
         }
         .jarvis-bar input:focus { outline: none; }
         .jarvis-bar button {
-            width: 48px;
-            height: 48px;
+            width: 38px;
+            height: 38px;
             border: none;
             border-radius: 50%;
             background: linear-gradient(135deg,#667eea,#764ba2);
             color: white;
             cursor: pointer;
-            font-size: 1.2rem;
+            font-size: 1rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -442,7 +558,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
 </head>
 <body>
 <div class="container">
-    <!-- AUTHENTICATION -->
     <div class="auth-container" id="auth-container">
         <div class="header">
             <h1>Smart Home</h1>
@@ -465,7 +580,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
         </div>
     </div>
 
-    <!-- UTILITY CONTROL SYSTEM -->
     <div class="app-container" id="app-container" style="display:none;">
         <div class="app-header">
             <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
@@ -499,7 +613,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
     </div>
 </div>
 
-<!-- Modal Dialog -->
 <div id="modal">
     <div class="modal-content">
         <h2>Add New Smart Node</h2>
@@ -510,11 +623,22 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
     </div>
 </div>
 
-<!-- Jarvis Interface Bar -->
-<div class="jarvis-bar" id="jarvis-bar-container">
-    <input type="text" id="jarvis-input" placeholder="Talk to Jarvis... e.g. Turn on bulb 1 in chintubedroom">
-    <button onclick="startVoiceInput()" title="Voice Input">🎤</button>
-    <button onclick="sendJarvisCommand()" title="Send Instruction Set">➤</button>
+<div class="jarvis-widget-launcher" id="jarvis-widget-toggle" onclick="toggleJarvisWidget()">🤖</div>
+
+<div class="jarvis-floating-card" id="jarvis-floating-panel">
+    <div class="widget-header">
+        <h3>⚡ Jarvis Voice Assistant</h3>
+        <button class="widget-close" onclick="toggleJarvisWidget()">✕</button>
+    </div>
+    
+    <div class="mic-indicator halted" id="always-on-status-indicator">Voice Active: OFF</div>
+    <button class="always-on-panel-btn" id="always-on-toggle-btn" onclick="toggleAlwaysOnListening()">🎙️ START ALWAYS ON LISTENING</button>
+    
+    <div class="jarvis-bar">
+        <input type="text" id="jarvis-input" placeholder="Talk to Jarvis...">
+        <button onclick="startVoiceInput()" title="Voice Input">🎤</button>
+        <button onclick="sendJarvisCommand()" title="Send Command">➤</button>
+    </div>
 </div>
 
 </body>
