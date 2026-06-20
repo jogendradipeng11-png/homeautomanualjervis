@@ -112,8 +112,8 @@
                         <h3>${dev.roomId} → ${dev.deviceId}</h3>
                         <div class="online-indicator" id="status-${dev.roomId}-${dev.deviceId}"></div>
                     </div>
-                    <button class="btn-control" onclick="selectDevice('${dev.roomId}', '${dev.deviceId}')">Open Controls</button>
-                    <button class="btn-remove" onclick="removeDevice('${dev.id}')">Remove</button>
+                    <button type="button" class="btn-control" onclick="selectDevice('${dev.roomId}', '${dev.deviceId}')">Open Controls</button>
+                    <button type="button" class="btn-remove" onclick="removeDevice('${dev.id}')">Remove</button>
                 `;
                 container.appendChild(card);
 
@@ -226,9 +226,9 @@
         }
 
         async function processWithNvidiaAI(text) {
-            if (userDevicesList.length === 0) return null;[cite: 1]
+            if (userDevicesList.length === 0) return null;
 
-            const currentDeviceContext = JSON.stringify(userDevicesList.map(d => ({ roomId: d.roomId, deviceId: d.deviceId })));[cite: 1]
+            const currentDeviceContext = JSON.stringify(userDevicesList.map(d => ({ roomId: d.roomId, deviceId: d.deviceId })));
             const prompt = `You are Jarvis, an advanced general-purpose AI assistant like Alexa, but with a highly respectful, polished tone (always use phrases like "Yes sir" or "Certainly sir" when confirming automation actions). You handle both smart home automation and general knowledge conversations.
 
 Available Smart Home Hardware: ${currentDeviceContext}
@@ -285,10 +285,10 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
         function processWithLocalFallback(text) {
             const norm = text.toLowerCase().trim();
             
-            let targetDevice = userDevicesList[0];[cite: 1]
+            let targetDevice = userDevicesList[0];
             let foundExplicitly = false;
-            for (let dev of userDevicesList) {[cite: 1]
-                if (norm.includes(dev.roomId.toLowerCase()) || norm.includes(dev.deviceId.toLowerCase())) {[cite: 1]
+            for (let dev of userDevicesList) {
+                if (norm.includes(dev.roomId.toLowerCase()) || norm.includes(dev.deviceId.toLowerCase())) {
                     targetDevice = dev;
                     foundExplicitly = true;
                     break;
@@ -325,11 +325,11 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
                 if (targetActions.length > 0) {
                     return {
                         "is_smart_home": true,
-                        "needs_clarification": !foundExplicitly && userDevicesList.length > 1,[cite: 1]
-                        "reply_text": !foundExplicitly && userDevicesList.length > 1 ? "Which node or room context should I apply that to, sir?" : "Yes sir, updating your appliances now.",[cite: 1]
+                        "needs_clarification": !foundExplicitly && userDevicesList.length > 1,
+                        "reply_text": !foundExplicitly && userDevicesList.length > 1 ? "Which node or room context should I apply that to, sir?" : "Yes sir, updating your appliances now.",
                         "commands": targetActions.map(act => ({
-                            room: targetDevice.roomId,[cite: 1]
-                            device: targetDevice.deviceId,[cite: 1]
+                            room: targetDevice.roomId,
+                            device: targetDevice.deviceId,
                             action: act.action,
                             value: act.value
                         }))
@@ -370,17 +370,17 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
 
                     if (result.is_smart_home && result.commands && result.commands.length > 0) {
                         result.commands.forEach(cmd => {
-                            const matchedDevice = userDevicesList.find(d =>[cite: 1]
+                            const matchedDevice = userDevicesList.find(d =>
                                 d.roomId.toLowerCase().trim() === cmd.room.toLowerCase().trim() && 
                                 d.deviceId.toLowerCase().trim() === cmd.device.toLowerCase().trim()
                             );
 
-                            const target = matchedDevice || userDevicesList[0];[cite: 1]
+                            const target = matchedDevice || userDevicesList[0];
                             if (!target) return;
 
                             if(cmd.action.startsWith('bulb')) {
                                 const num = cmd.action.replace('bulb','');
-                                set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/bulb${num}`), !!cmd.value);[cite: 1]
+                                set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/bulb${num}`), !!cmd.value);
                             } else if(cmd.action === 'fanSpeed') {
                                 set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/fanSpeed`), parseInt(cmd.value, 10) || 0);
                             }
@@ -408,6 +408,10 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
             recog.onstart = () => {
                 micBtn.style.background = "#e74c3c"; 
                 document.getElementById('jarvis-input').placeholder = "Listening...";
+            };
+
+            document.onmouseup = () => {
+                // Drag tracking reset handle logic placeholder connection structure
             };
 
             recog.onerror = () => { resetMicUI(); };
@@ -613,7 +617,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
 </head>
 <body>
 <div class="container">
-    <!-- AUTHENTICATION -->
     <div class="auth-container" id="auth-container">
         <div class="header">
             <h1>Smart Home</h1>
@@ -623,7 +626,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
             <div class="error-message" id="login-error"></div>
             <div class="form-group"><input type="email" id="login-email" placeholder="Email Address"></div>
             <div class="form-group"><input type="password" id="login-password" placeholder="Password"></div>
-            <button class="btn" onclick="login()">Login</button>
+            <button type="button" class="btn" onclick="login()">Login</button>
             <div class="switch-form"><p>Need an account? <a onclick="showSignup()">Sign up</a></p></div>
         </div>
         <div class="form-container" id="signup-form" style="display:none;">
@@ -631,21 +634,20 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
             <div class="form-group"><input type="email" id="signup-email" placeholder="Email Address"></div>
             <div class="form-group"><input type="password" id="signup-password" placeholder="Password"></div>
             <div class="form-group"><input type="password" id="signup-confirm-password" placeholder="Confirm Password"></div>
-            <button class="btn" onclick="signup()">Create Account</button>
+            <button type="button" class="btn" onclick="signup()">Create Account</button>
             <div class="switch-form"><p>Already registered? <a onclick="showLogin()">Login</a></p></div>
         </div>
     </div>
 
-    <!-- UTILITY CONTROL SYSTEM -->
     <div class="app-container" id="app-container" style="display:none;">
         <div class="app-header">
             <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <button type="button" class="logout-btn" onclick="logout()">Logout</button>
         </div>
         <div class="controls">
-            <button class="btn" id="add-device-btn">+ Add Room & Device Target</button>
-            <button class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
-            <button id="back-btn" onclick="goBack()">← Back to Device List</button>
+            <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
+            <button type="button" class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
+            <button type="button" id="back-btn" onclick="goBack()">← Back to Device List</button>
             <div id="device-list"></div>
             
             <div id="control-panel">
@@ -659,10 +661,10 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
                 <div class="fan-control">
                     <h3>Fan Speed Regulator</h3>
                     <div class="speed-buttons">
-                        <button class="speed-btn" onclick="setFanSpeed(0)">OFF</button>
-                        <button class="speed-btn" onclick="setFanSpeed(1)">LOW</button>
-                        <button class="speed-btn" onclick="setFanSpeed(2)">MED</button>
-                        <button class="speed-btn" onclick="setFanSpeed(3)">HIGH</button>
+                        <button type="button" class="speed-btn" onclick="setFanSpeed(0)">OFF</button>
+                        <button type="button" class="speed-btn" onclick="setFanSpeed(1)">LOW</button>
+                        <button type="button" class="speed-btn" onclick="setFanSpeed(2)">MED</button>
+                        <button type="button" class="speed-btn" onclick="setFanSpeed(3)">HIGH</button>
                     </div>
                     <div class="status" id="fan-status">Current: OFF</div>
                 </div>
@@ -671,18 +673,16 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
     </div>
 </div>
 
-<!-- Modal Dialog -->
 <div id="modal">
     <div class="modal-content">
         <h2>Add New Smart Node</h2>
         <div class="form-group"><input type="text" id="room-id" placeholder="Room ID (e.g., chintubedroom)"></div>
         <div class="form-group"><input type="text" id="device-id" placeholder="Device Node ID (e.g., chintubedroom)"></div>
-        <button class="btn" onclick="addDevice()">Save and Connect</button>
-        <button class="btn" style="background:#6c757d; margin-top:10px;" id="close-modal">Cancel</button>
+        <button type="button" class="btn" onclick="addDevice()">Save and Connect</button>
+        <button type="button" class="btn" style="background:#6c757d; margin-top:10px;" id="close-modal">Cancel</button>
     </div>
 </div>
 
-<!-- ====================== FLOATING WIZARD STRUCTURE ELEMENT MAP ====================== -->
 <div class="jarvis-wizard-wrapper" id="jarvis-wizard-container">
     <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)" title="Drag to move / Click to setup commands">🤖</div>
     
@@ -690,15 +690,15 @@ Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quo
         <div class="jarvis-panel-header" id="jarvis-drag-header" title="Drag window layout box">
             <h4>🔵 Jarvis Smart Core</h4>
             <div class="jarvis-panel-actions">
-                <button onclick="window.toggleJarvisWizard(false)" title="Minimize Wizard" style="font-weight: bold;">−</button>
-                <button class="power-off" onclick="window.turnOffJarvisWizard()" title="Completely Turn Off Jarvis Wizard">✕</button>
+                <button type="button" onclick="window.toggleJarvisWizard(false)" title="Minimize Wizard" style="font-weight: bold;">−</button>
+                <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()" title="Completely Turn Off Jarvis Wizard">✕</button>
             </div>
         </div>
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
                 <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
-                <button class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="startVoiceInput()" title="Voice Input">🎤</button>
-                <button class="jarvis-action-btn send-btn" onclick="sendJarvisCommand()" title="Send">➤</button>
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="startVoiceInput()" title="Voice Input">🎤</button>
+                <button type="button" class="jarvis-action-btn send-btn" onclick="sendJarvisCommand()" title="Send">➤</button>
             </div>
         </div>
     </div>
