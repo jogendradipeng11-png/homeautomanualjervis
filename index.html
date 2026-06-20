@@ -36,14 +36,18 @@
                 document.getElementById('user-name').textContent = user.email.split('@')[0];
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
-                document.getElementById('jarvis-bar-container').style.display = 'flex';
+                
+                // Show floating wizard if it wasn't explicitly turned off by user
+                if (localStorage.getItem('jarvis-enabled') !== 'false') {
+                    document.getElementById('jarvis-wizard-container').style.display = 'block';
+                }
                 loadUserDevices();
             } else {
                 currentUser = null;
                 userDevicesList = [];
                 document.getElementById('auth-container').style.display = 'block';
                 document.getElementById('app-container').style.display = 'none';
-                document.getElementById('jarvis-bar-container').style.display = 'none';
+                document.getElementById('jarvis-wizard-container').style.display = 'none';
             }
         });
 
@@ -240,11 +244,10 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                 
                 return JSON.parse(txt.substring(firstBracket, lastBracket + 1));
             } catch(e) {
-                return null; // Gracefully route down to local system regex engine
+                return null; 
             }
         }
 
-        // LOCAL AUTONOMOUS PARSER: Works instantaneously without needing any active web keys!
         function processWithLocalFallback(text) {
             const norm = text.toLowerCase().trim();
             let action = "bulb1";
@@ -263,7 +266,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                 else value = 1;
             }
 
-            // Target search matching
             let targetDevice = userDevicesList[0]; 
             for (let dev of userDevicesList) {
                 if (norm.includes(dev.roomId.toLowerCase()) || norm.includes(dev.deviceId.toLowerCase())) {
@@ -285,11 +287,10 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
             if(!text) return;
             
             input.disabled = true;
-            input.placeholder = "Jarvis processing instruction fields...";
+            input.placeholder = "Processing command...";
 
             try {
                 let result = await processWithNvidiaAI(text);
-                
                 if (!result) {
                     result = processWithLocalFallback(text);
                 }
@@ -301,7 +302,6 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                             d.deviceId.toLowerCase().trim() === cmd.device.toLowerCase().trim()
                         );
 
-                        // If explicit room lookup returns empty, direct switch onto the user's primary active profile index item card
                         const target = matchedDevice || userDevicesList[0];
                         if (!target) return;
 
@@ -314,35 +314,32 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
                     });
                     input.value = '';
                 } else {
-                    alert("Jarvis could not match that item configuration layout phrase context. Try adding a device target first.");
+                    alert("Jarvis configuration layout match failed.");
                 }
             } catch (err) {
                 console.error(err);
             } finally {
-                // Crucial Reset Core fix: This line runs no matter what to prevent input lockouts!
                 input.disabled = false;
-                input.placeholder = "Talk to Jarvis... e.g. Turn on bulb 1 in chintubedroom";
+                input.placeholder = "Ask Jarvis...";
                 input.focus();
             }
         };
 
         window.startVoiceInput = () => {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if(!SpeechRecognition) return alert("Web Speech platform drivers not accessible.");
+            if(!SpeechRecognition) return alert("Web Speech engine unavailable.");
             
             const recog = new SpeechRecognition();
             recog.lang = 'en-US';
-            
-            const micBtn = document.querySelector(".jarvis-bar button[title='Voice Input']");
+            const micBtn = document.getElementById("jarvis-mic-btn");
             
             recog.onstart = () => {
                 micBtn.style.background = "#e74c3c"; 
-                document.getElementById('jarvis-input').placeholder = "Listening... speak now.";
+                document.getElementById('jarvis-input').placeholder = "Listening...";
             };
 
             recog.onerror = () => { resetMicUI(); };
             recog.onend = () => { resetMicUI(); };
-
             recog.onresult = e => {
                 document.getElementById('jarvis-input').value = e.results[0][0].transcript;
                 sendJarvisCommand();
@@ -350,15 +347,90 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
 
             function resetMicUI() {
                 micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)";
-                document.getElementById('jarvis-input').placeholder = "Talk to Jarvis... e.g. Turn on bulb 1 in chintubedroom";
+                document.getElementById('jarvis-input').placeholder = "Ask Jarvis...";
             }
-
             recog.start();
         };
+
+        // ====================== FLOATING WIZARD CONTROLLER OPERATIONS ======================
+        window.toggleJarvisWizard = (expand) => {
+            const orb = document.getElementById('jarvis-orb');
+            const panel = document.getElementById('jarvis-panel');
+            if(expand) {
+                orb.style.display = 'none';
+                panel.style.display = 'block';
+            } else {
+                orb.style.display = 'flex';
+                panel.style.display = 'none';
+            }
+        };
+
+        window.turnOffJarvisWizard = () => {
+            if(confirm("Do you want to completely shut down and hide the Jarvis window wizard?")) {
+                document.getElementById('jarvis-wizard-container').style.display = 'none';
+                localStorage.setItem('jarvis-enabled', 'false');
+                if(document.getElementById('re-enable-jarvis-btn')) {
+                    document.getElementById('re-enable-jarvis-btn').style.display = 'inline-block';
+                }
+            }
+        };
+
+        window.activateJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'block';
+            localStorage.setItem('jarvis-enabled', 'true');
+            document.getElementById('re-enable-jarvis-btn').style.display = 'none';
+            window.toggleJarvisWizard(true);
+        };
+
+        // Initial setup for bringing it back from header panel
+        document.addEventListener("DOMContentLoaded", () => {
+            if (localStorage.getItem('jarvis-enabled') === 'false') {
+                document.getElementById('re-enable-jarvis-btn').style.display = 'inline-block';
+            }
+            makeWizardDraggable();
+        });
+
+        function makeWizardDraggable() {
+            const container = document.getElementById("jarvis-wizard-container");
+            const header = document.getElementById("jarvis-drag-header");
+            const orb = document.getElementById("jarvis-orb");
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+            header.onmousedown = dragMouseDown;
+            orb.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                container.style.top = (container.offsetTop - pos2) + "px";
+                container.style.left = (container.offsetLeft - pos1) + "px";
+                container.style.bottom = "auto";
+                container.style.right = "auto";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
     </script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:Arial,sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; padding-bottom: 120px; }
+        body { font-family:Arial,sans-serif; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
         .container { width:100%; max-width:1200px; }
         .auth-container { background:white; border-radius:20px; box-shadow:0 20px 40px rgba(0,0,0,0.15); overflow:hidden; max-width:400px; margin:0 auto; }
         .header { background:linear-gradient(135deg,#2c3e50,#34495e); color:white; padding:40px 30px; text-align:center; }
@@ -374,7 +446,8 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
         .app-header { background:linear-gradient(135deg,#2c3e50,#34495e); color:white; padding:20px 30px; display:flex; justify-content:space-between; align-items:center; }
         .logout-btn { background:#e74c3c; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; font-weight: bold; }
         .controls { padding:30px; }
-        #add-device-btn { width:auto; padding:14px 30px; display:inline-block; margin-bottom:20px; }
+        #add-device-btn { width:auto; padding:14px 30px; display:inline-block; margin-bottom:20px; margin-right:10px; }
+        #re-enable-jarvis-btn { width:auto; padding:14px 30px; display:none; margin-bottom:20px; background:linear-gradient(135deg, #11998e, #38ef7d); }
         #device-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; margin-top:20px; }
         .room-card { background:#f8f9fa; border-radius:15px; padding:25px; text-align:center; box-shadow:0 8px 25px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }
         .room-header { margin-bottom:15px; display: flex; justify-content: space-between; align-items: center; }
@@ -398,45 +471,72 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:2000; }
         .modal-content { background:white; padding:35px; border-radius:15px; width:90%; max-width:420px; text-align:center; }
         
-        .jarvis-bar {
+        /* ====================== FLOATING WIZARD COMPONENT CONTAINER STYLES ====================== */
+        .jarvis-wizard-wrapper {
             position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(44, 62, 80, 0.98);
-            padding: 12px 20px;
-            border-radius: 50px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            bottom: 30px;
+            right: 30px;
+            z-index: 5000;
             display: none;
-            align-items: center;
-            gap: 10px;
-            z-index: 1000;
-            width: 90%;
-            max-width: 700px;
-            border: 1px solid rgba(255,255,255,0.1);
         }
-        .jarvis-bar input {
-            flex: 1;
-            padding: 14px 20px;
-            border: none;
-            border-radius: 50px;
-            background: #1a252f;
-            color: white;
-            font-size: 1.05rem;
-        }
-        .jarvis-bar input:focus { outline: none; }
-        .jarvis-bar button {
-            width: 48px;
-            height: 48px;
-            border: none;
+        .jarvis-orb {
+            width: 65px;
+            height: 65px;
             border-radius: 50%;
-            background: linear-gradient(135deg,#667eea,#764ba2);
-            color: white;
-            cursor: pointer;
-            font-size: 1.2rem;
+            background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%);
+            box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4), inset 0 0 15px rgba(255,255,255,0.6);
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 1.8rem;
+            cursor: move;
+            transition: transform 0.2s ease;
+            animation: floatingPulse 2s infinite ease-in-out;
+        }
+        .jarvis-orb:hover { transform: scale(1.08); }
+        .jarvis-panel {
+            display: none;
+            width: 340px;
+            background: rgba(23, 32, 42, 0.96);
+            border: 2px solid #00d2ff;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            overflow: hidden;
+        }
+        .jarvis-panel-header {
+            background: linear-gradient(135deg, #1c2833, #2c3e50);
+            padding: 12px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: move;
+        }
+        .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
+        .jarvis-panel-actions { display: flex; gap: 8px; }
+        .jarvis-panel-actions button {
+            background: none; border: none; color: #bdc3c7; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+        }
+        .jarvis-panel-actions button:hover { color: white; background: rgba(255,255,255,0.1); }
+        .jarvis-panel-actions .power-off:hover { color: #e74c3c; }
+        .jarvis-panel-body { padding: 15px; }
+        .jarvis-input-group {
+            display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e;
+        }
+        .jarvis-input-group input {
+            flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem;
+        }
+        .jarvis-input-group input:focus { outline: none; }
+        .jarvis-action-btn {
+            width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem;
+        }
+        .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
+        .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
+
+        @keyframes floatingPulse {
+            0% { transform: translateY(0px); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4); }
+            50% { transform: translateY(-8px); box-shadow: 0 15px 40px rgba(0, 102, 255, 0.6); }
+            100% { transform: translateY(0px); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4); }
         }
     </style>
 </head>
@@ -473,6 +573,7 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
         </div>
         <div class="controls">
             <button class="btn" id="add-device-btn">+ Add Room & Device Target</button>
+            <button class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
             <button id="back-btn" onclick="goBack()">← Back to Device List</button>
             <div id="device-list"></div>
             
@@ -510,11 +611,28 @@ Return ONLY clean raw minified JSON. Do not include markdown codeblocks or quote
     </div>
 </div>
 
-<!-- Jarvis Interface Bar -->
-<div class="jarvis-bar" id="jarvis-bar-container">
-    <input type="text" id="jarvis-input" placeholder="Talk to Jarvis... e.g. Turn on bulb 1 in chintubedroom">
-    <button onclick="startVoiceInput()" title="Voice Input">🎤</button>
-    <button onclick="sendJarvisCommand()" title="Send Instruction Set">➤</button>
+<!-- ====================== FLOATING WIZARD STRUCTURE ELEMENT MAP ====================== -->
+<div class="jarvis-wizard-wrapper" id="jarvis-wizard-container">
+    <!-- Minimized Floating Sphere View Component -->
+    <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)" title="Drag to move / Click to setup commands">🤖</div>
+    
+    <!-- Expanded Control Utility Card Container Node Panel -->
+    <div class="jarvis-panel" id="jarvis-panel">
+        <div class="jarvis-panel-header" id="jarvis-drag-header" title="Drag window layout box">
+            <h4>🔵 Jarvis Smart Core</h4>
+            <div class="jarvis-panel-actions">
+                <button onclick="window.toggleJarvisWizard(false)" title="Minimize Wizard" style="font-weight: bold;">−</button>
+                <button class="power-off" onclick="window.turnOffJarvisWizard()" title="Completely Turn Off Jarvis Wizard">✕</button>
+            </div>
+        </div>
+        <div class="jarvis-panel-body">
+            <div class="jarvis-input-group">
+                <input type="text" id="jarvis-input" placeholder="Ask Jarvis...">
+                <button class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="startVoiceInput()" title="Voice Input">🎤</button>
+                <button class="jarvis-action-btn send-btn" onclick="sendJarvisCommand()" title="Send">➤</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 </body>
