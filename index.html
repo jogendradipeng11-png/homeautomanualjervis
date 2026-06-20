@@ -206,7 +206,7 @@
             if (e.target === modal) modal.style.display = 'none';
         };
 
-        // ====================== DYNAMIC GENERATIVE JARVIS INTELLIGENCE ENGINE ======================
+        // ====================== ENHANCED GENERAL AI ASSISTANT ENGINE ======================
         
         function jarvisSpeak(text) {
             return new Promise((resolve) => {
@@ -233,28 +233,27 @@
 
             const currentDeviceContext = JSON.stringify(userDevicesList.map(d => ({ roomId: d.roomId, deviceId: d.deviceId })));
             
-            // Generate live time parameters to inject straight into ChatGPT/Llama style context rules
             const now = new Date();
             const liveClockString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + " on " + now.toDateString();
 
-            const prompt = `You are Jarvis, a highly advanced general-purpose reasoning AI assistant similar to a conversational ChatGPT node. You have a formal, respectful assistant voice using phrases like "Yes sir" or "Certainly sir".
+            const prompt = `You are Jarvis, a highly advanced general-purpose reasoning assistant like ChatGPT or Alexa. Address the user respectfully as "sir" or "ma'am" when communicating.
 
-Current Clock Time: ${liveClockString}
-Available Smart Home Hardware Nodes: ${currentDeviceContext}
+Current Date and Clock Time: ${liveClockString}
+Available Smart Home Hardware Configurations: ${currentDeviceContext}
 User Voice/Text Input: "${text}"
 
-Your Instructions:
-1. Determine if the user is asking a general knowledge or status query (e.g., "what is the time now", "cricket update", "how are you", "who is Einstein", "tell me a joke") or trying to control a smart home appliance.
-2. If it is a GENERAL CONVERSATIONAL STATEMENT OR TIME ENQUIRY:
+Your operational constraints:
+1. Identify if the user is asking a general conversation query (e.g., "what is the time now", "cricket updates", "how are you", "tell me a joke") or commanding a hardware appliance toggle.
+2. If it is a GENERAL KNOWLEDGE / CONVERSATION / TIME STATEMENT:
    - Set "is_smart_home" to false.
    - Set "needs_clarification" to false.
-   - Provide a natural, precise, helpful answer inside "reply_text". Use the Current Clock Time variable to say the exact time if asked. Keep answers concise.
-3. If it is a SMART HOME HARDWARE NODE COMMAND:
+   - Write your natural response directly inside "reply_text". Use the context provided above to tell the exact current time if asked. Keep replies concise and ready to be read aloud.
+3. If it is a SMART HOME COMMAND:
    - Set "is_smart_home" to true.
-   - If missing room or device target context words, set "needs_clarification" to true and ask for location clarification in "reply_text".
-   - If complete, map adjustments to the "commands" array (actions: "bulb1"-"bulb4" or "fanSpeed" 0-3). Confirm respectfully in "reply_text" (e.g., "Yes sir, setting chintubedroom fan speed to low.").
+   - If missing target location context names, set "needs_clarification" to true and ask for the missing details in "reply_text".
+   - If complete, map the updates to the "commands" array (actions: "bulb1"-"bulb4" or "fanSpeed" 0-3). Confirm respectfully in "reply_text" (e.g., "Yes sir, setting chintubedroom fan speed to low.").
 
-Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
+Return ONLY clean, raw, minified JSON. Do not include markdown codeblocks or quotes:
 {
   "is_smart_home": false,
   "needs_clarification": false,
@@ -292,7 +291,6 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
             }
         }
 
-        // FULL INTERACTIVE FALLBACK DIALOG MATRIX (Bypasses security and CORS bottlenecks natively)
         function processWithLocalFallback(text) {
             const norm = text.toLowerCase().trim();
             const now = new Date();
@@ -659,6 +657,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
 </head>
 <body>
 <div class="container">
+    <!-- AUTHENTICATION -->
     <div class="auth-container" id="auth-container">
         <div class="header">
             <h1>Smart Home</h1>
@@ -681,6 +680,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
         </div>
     </div>
 
+    <!-- UTILITY CONTROL SYSTEM -->
     <div class="app-container" id="app-container" style="display:none;">
         <div class="app-header">
             <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
@@ -715,6 +715,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
     </div>
 </div>
 
+<!-- Modal Dialog -->
 <div id="modal">
     <div class="modal-content">
         <h2>Add New Smart Node</h2>
@@ -725,6 +726,7 @@ Return ONLY clean, raw, minified JSON. Do not include markdown blocks or quotes:
     </div>
 </div>
 
+<!-- ====================== FLOATING WIZARD STRUCTURE ELEMENT MAP ====================== -->
 <div class="jarvis-wizard-wrapper" id="jarvis-wizard-container">
     <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)" title="Drag to move / Click to setup commands">🤖</div>
     
