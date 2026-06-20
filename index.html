@@ -307,49 +307,49 @@ Return ONLY clean raw minified JSON. No markdown wrappers:
     }
 
     window.sendJarvisCommand = async () => {
-        const input = document.getElementById('jarvis-input');
-        const text = input.value.trim();
-        if(!text) return;
-        
-        input.disabled = true;
-        input.placeholder = "Processing command...";
+    const input = document.getElementById('jarvis-input');
+    const text = input.value.trim();
+    if(!text) return;
+    
+    input.disabled = true;
+    input.placeholder = "Processing command...";
 
-        try {
-            let result = await processWithNvidiaAI(text);
-            if (!result) {
-                result = processWithLocalFallback(text);
-            }
-            
-            if(result?.commands && result.commands.length > 0) {
-                result.commands.forEach(cmd => {
-                    const matchedDevice = userDevicesList.find(d => 
-                        d.roomId.toLowerCase().trim() === cmd.room.toLowerCase().trim() && 
-                        d.deviceId.toLowerCase().trim() === cmd.device.toLowerCase().trim()
-                    );
-
-                    const target = matchedDevice || userDevicesList[0];
-                    if (!target) return;
-
-                    if(cmd.action.startsWith('bulb')) {
-                        const num = cmd.action.replace('bulb','');
-                        set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/bulb${num}`), !!cmd.value);
-                    } else if(cmd.action === 'fanSpeed') {
-                        set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/fanSpeed`, parseInt(cmd.value, 10) || 0));
-                    }
-                });
-                input.value = '';
-            } else {
-                alert("Jarvis configuration layout match failed.");
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            input.disabled = false;
-            input.placeholder = "Ask Jarvis...";
-            input.focus();
+    try {
+        let result = await processWithNvidiaAI(text);
+        if (!result) {
+            result = processWithLocalFallback(text);
         }
-    };
+        
+        if(result?.commands && result.commands.length > 0) {
+            result.commands.forEach(cmd => {
+                const matchedDevice = userDevicesList.find(d => 
+                    d.roomId.toLowerCase().trim() === cmd.room.toLowerCase().trim() && 
+                    d.deviceId.toLowerCase().trim() === cmd.device.toLowerCase().trim()
+                );
 
+                const target = matchedDevice || userDevicesList[0];
+                if (!target) return;
+
+                if(cmd.action.startsWith('bulb')) {
+                    const num = cmd.action.replace('bulb','');
+                    set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/bulb${num}`), !!cmd.value);
+                } else if(cmd.action === 'fanSpeed') {
+                    // Corrected database reference format below:
+                    set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/fanSpeed`), parseInt(cmd.value, 10) || 0);
+                }
+            });
+            input.value = '';
+        } else {
+            alert("Jarvis configuration layout match failed.");
+        }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        input.disabled = false;
+        input.placeholder = "Ask Jarvis...";
+        input.focus();
+    }
+};
     window.startVoiceInput = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if(!SpeechRecognition) return alert("Web Speech engine unavailable.");
