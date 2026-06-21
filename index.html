@@ -26,8 +26,8 @@
         let currentUser = null;
         let userDevicesList = []; 
 
-        // 🔑 YOUR SECURITY KEY MATRIX LOADED SUCCESSFULLY
-        const OPENROUTER_API_KEY = "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";
+        // 🔑 YOUR ACTIVE OPENROUTER PARAMETER
+        const OPENROUTER_API_KEY = "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";
 
         window.activeRoom = null;
         window.activeDevice = null;
@@ -243,7 +243,7 @@
             }
 
             // Unrestricted Direct OpenRouter Interface
-            if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_KEY_HERE" || !OPENROUTER_API_KEY) {
+            if (OPENROUTER_API_KEY === "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" || !OPENROUTER_API_KEY) {
                 await jarvisSpeak("Sir, please verify your OpenRouter key parameter placement on line 31.");
                 input.disabled = false; input.placeholder = "Ask Jarvis Anything...";
                 return;
@@ -256,9 +256,9 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${OPENROUTER_API_KEY.trim()}`
                     },
-                   body: JSON.stringify({
-                        // 🌟 PASTE THE NEW NVIDIA MODEL ID RIGHT HERE:
-                        model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", 
+                    body: JSON.stringify({
+                        // Swapping to a high-uptime free model that bypasses authorization blocks
+                        model: "meta-llama/llama-3-8b-instruct:free", 
                         messages: [
                             { role: "system", content: "You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily." },
                             { role: "user", content: text }
@@ -411,7 +411,7 @@
             <div id="control-panel">
                 <h2 id="control-title">Select a device</h2>
                 <div class="bulbs-grid">
-                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div> h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
