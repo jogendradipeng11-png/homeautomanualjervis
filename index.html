@@ -4,18 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Home - Multi Room Control</title>
-    <script type="importmap">
-        {
-            "imports": {
-                "@xenova/transformers": "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2"
-            }
-        }
-    </script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
         import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
-        import { pipeline } from "@xenova/transformers";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBpq3OMuZetPXgrA3jPb-EacSyJ7hSHGRk",
@@ -33,25 +25,12 @@
         const db = getDatabase(app);
         let currentUser = null;
         let userDevicesList = []; 
-        let aiPipeline = null; // Browser AI instance variable
+
+        // 🔗 Connected Directly to your Live Web Service URL Endpoint on Render
+        const RENDER_BACKEND_URL = "https://jarvis-brain-core.onrender.com/api/jarvis";
 
         window.activeRoom = null;
         window.activeDevice = null;
-
-        // Initialize Browser AI Background Core
-        async function initBrowserAI() {
-            const statusIndicator = document.getElementById('jarvis-ai-status');
-            try {
-                statusIndicator.textContent = "Jarvis Engine: Loading Brain...";
-                // Load an ultra-lightweight, 24MB conversational intent extractor directly into browser memory
-                aiPipeline = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-mnli');
-                statusIndicator.textContent = "Jarvis Engine: Online 🟢";
-                statusIndicator.style.color = "#2ecc71";
-            } catch (e) {
-                console.error("Local AI initialization error: ", e);
-                statusIndicator.textContent = "Jarvis Engine: Hybrid Mode";
-            }
-        }
 
         // Auth State Tracking
         onAuthStateChanged(auth, (user) => {
@@ -65,7 +44,6 @@
                     document.getElementById('jarvis-wizard-container').style.display = 'block';
                 }
                 loadUserDevices();
-                initBrowserAI();
             } else {
                 currentUser = null;
                 userDevicesList = [];
@@ -228,12 +206,12 @@
             if (e.target === modal) modal.style.display = 'none';
         };
 
-        // ====================== HYBRID AI PROCESSING MATRIX ======================
+        // ====================== NATIVE VOICE SYNTHESIS CRITICAL DRIVER ======================
         
         function jarvisSpeak(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) {
-                    console.log("Speech synthesis not supported: " + text);
+                    console.log("Speech synthesis audio drivers not supported on this browser: " + text);
                     resolve();
                     return;
                 }
@@ -250,134 +228,25 @@
             });
         }
 
-        async function processJarvisBrain(text) {
+        // STATIC INTENT EMULATOR MATRIX (Acts as instantaneous fallback if Render is initializing or sleeping)
+        function processWithLocalFallback(text) {
             const norm = text.toLowerCase().trim();
             const now = new Date();
-
-            // 1. Natural Language Intent Classifier via Local AI Engine
-            let predictedIntent = "general_chat";
-            if (aiPipeline) {
-                const labels = ['home automation command', 'time and status check request', 'casual greeting conversation'];
-                const output = await aiPipeline(norm, labels);
-                if (output && output[0]) {
-                    const topResult = output[0];
-                    if (topResult.label === 'home automation command' && topResult.score > 0.4) predictedIntent = "automation";
-                    else if (topResult.label === 'time and status check request') predictedIntent = "status_check";
-                }
-            }
-
-            // Fallback keywords logic if the intent classifier needs reinforcement
-            if (norm.includes("bulb") || norm.includes("light") || norm.includes("fan") || norm.includes("switch")) {
-                predictedIntent = "automation";
-            }
-
-            // 2. Execute Dialog Responses based on Classified Intents
+            
             if (norm.includes("time") || norm.includes("clock") || norm.includes("what is the time")) {
                 const liveTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                return {
-                    "is_smart_home": false,
-                    "reply_text": `The current time is exactly ${liveTime}, sir.`,
-                    "commands": []
-                };
+                return { "reply_text": `The current time is exactly ${liveTime}, sir.` };
             }
             if (norm.includes("cricket") || norm.includes("match") || norm.includes("score")) {
-                return {
-                    "is_smart_home": false,
-                    "reply_text": "Accessing active fixtures, sir. Live cricket tournaments are currently streaming their matching iterations. Please track your external dashboard widget for ball-by-ball updates.",
-                    "commands": []
-                };
+                return { "reply_text": "Accessing local trace memory logs, sir. Sports updates are tracking on background clusters. Check your streaming score widget dashboard to pull down telemetry." };
             }
             if (norm.includes("how are you")) {
-                return {
-                    "is_smart_home": false,
-                    "reply_text": "I am operating at peak efficiency parameters, sir. Thank you for checking in.",
-                    "commands": []
-                };
+                return { "reply_text": "Local core parameters are stable layout, sir. Thank you for keeping track of my metrics." };
             }
             if (norm.includes("hello") || norm.includes("hi jarvis") || norm.includes("hey jarvis")) {
-                return {
-                    "is_smart_home": false,
-                    "reply_text": "Hello sir. Smart home nodes are stable and initialized. Standing by for your instructions.",
-                    "commands": []
-                };
+                return { "reply_text": "Hello sir. Device list components initialized successfully. Standing by." };
             }
-            if (norm.includes("joke")) {
-                return {
-                    "is_smart_home": false,
-                    "reply_text": "Certainly sir. Why did the smart home appliance call a therapist? Because it felt like its user was always pushing its buttons!",
-                    "commands": []
-                };
-            }
-
-            // 3. Smart Home Command Execution Parsing
-            if (predictedIntent === "automation") {
-                let targetDevice = userDevicesList[0];
-                let foundExplicitly = false;
-                for (let dev of userDevicesList) {
-                    if (norm.includes(dev.roomId.toLowerCase()) || norm.includes(dev.deviceId.toLowerCase())) {
-                        targetDevice = dev;
-                        foundExplicitly = true;
-                        break;
-                    }
-                }
-
-                const isOffAction = norm.includes("off") || norm.includes("stop") || norm.includes("deactivate");
-                const isOnAction = norm.includes("on") || norm.includes("start") || norm.includes("activate");
-                
-                let targetActions = [];
-                let phraseDetail = "";
-
-                if (norm.includes("all") || (norm.includes("bulb") && !/\d/.test(norm))) {
-                    targetActions.push({ action: "bulb1", value: isOnAction });
-                    targetActions.push({ action: "bulb2", value: isOnAction });
-                    targetActions.push({ action: "bulb3", value: isOnAction });
-                    targetActions.push({ action: "bulb4", value: isOnAction });
-                    phraseDetail = `all appliances`;
-                } else {
-                    if (norm.includes("bulb 1") || norm.includes("bulb1")) { targetActions.push({ action: "bulb1", value: isOnAction }); phraseDetail = "bulb 1"; }
-                    if (norm.includes("bulb 2") || norm.includes("bulb2")) { targetActions.push({ action: "bulb2", value: isOnAction }); phraseDetail = "bulb 2"; }
-                    if (norm.includes("bulb 3") || norm.includes("bulb3")) { targetActions.push({ action: "bulb3", value: isOnAction }); phraseDetail = "bulb 3"; }
-                    if (norm.includes("bulb 4") || norm.includes("bulb4")) { targetActions.push({ action: "bulb4", value: isOnAction }); phraseDetail = "bulb 4"; }
-                }
-
-                if (norm.includes("fan")) {
-                    let fanVal = 0;
-                    let speedText = "off";
-                    if (isOffAction) { fanVal = 0; speedText = "off"; }
-                    else if (norm.includes("low") || norm.includes("speed 1")) { fanVal = 1; speedText = "low"; }
-                    else if (norm.includes("medium") || norm.includes("med") || norm.includes("speed 2")) { fanVal = 2; speedText = "medium"; }
-                    else if (norm.includes("high") || norm.includes("speed 3")) { fanVal = 3; speedText = "high"; }
-                    else if (isOnAction) { fanVal = 1; speedText = "low"; }
-                    targetActions.push({ action: "fanSpeed", value: fanVal });
-                    phraseDetail = `fan regulator speed to ${speedText}`;
-                }
-
-                if (targetActions.length > 0) {
-                    if (!foundExplicitly && userDevicesList.length > 1) {
-                        return {
-                            "is_smart_home": false,
-                            "reply_text": "Which room node or layout device should I execute that instruction on, sir?",
-                            "commands": []
-                        };
-                    }
-                    return {
-                        "is_smart_home": true,
-                        "reply_text": `Certainly sir, shifting your ${phraseDetail} configuration inside ${targetDevice.roomId}.`,
-                        "commands": targetActions.map(act => ({
-                            room: targetDevice.roomId,
-                            device: targetDevice.deviceId,
-                            action: act.action,
-                            value: act.value
-                        }))
-                    };
-                }
-            }
-
-            return {
-                "is_smart_home": false,
-                "reply_text": "I am online and tracking parameters, sir. Let me know if you would like me to adjust an environment switch node.",
-                "commands": []
-            };
+            return { "reply_text": "Establishing interface synchronization loop, sir. Standing by." };
         }
 
         window.sendJarvisCommand = async () => {
@@ -386,36 +255,33 @@
             if(!text) return;
             
             input.disabled = true;
-            input.placeholder = "Jarvis processing...";
+            input.placeholder = "Jarvis processing instruction...";
 
             try {
-                let result = await processJarvisBrain(text);
+                // Relays capture text parameter strings over to your Hosted Node Proxy architecture on Render
+                const response = await fetch(RENDER_BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        devices: userDevicesList,
+                        uid: currentUser ? currentUser.uid : null
+                    })
+                });
+
+                const data = await response.json();
                 
-                if (result) {
-                    await jarvisSpeak(result.reply_text);
-
-                    if (result.is_smart_home && result.commands && result.commands.length > 0) {
-                        result.commands.forEach(cmd => {
-                            const matchedDevice = userDevicesList.find(d =>
-                                d.roomId.toLowerCase().trim() === cmd.room.toLowerCase().trim() && 
-                                d.deviceId.toLowerCase().trim() === cmd.device.toLowerCase().trim()
-                            );
-
-                            const target = matchedDevice || userDevicesList[0];
-                            if (!target) return;
-
-                            if(cmd.action.startsWith('bulb')) {
-                                const num = cmd.action.replace('bulb','');
-                                set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/bulb${num}`), !!cmd.value);
-                            } else if(cmd.action === 'fanSpeed') {
-                                set(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states/fanSpeed`), parseInt(cmd.value, 10) || 0);
-                            }
-                        });
-                    }
+                if (data && data.reply_text) {
+                    await jarvisSpeak(data.reply_text);
                     input.value = '';
                 }
             } catch (err) {
-                console.error(err);
+                console.warn("Render backend loading context sequence. Dropping down to localized matrix matching structures.", err);
+                const backupResult = processWithLocalFallback(text);
+                await jarvisSpeak(backupResult.reply_text);
+                input.value = '';
             } finally {
                 input.disabled = false;
                 input.placeholder = "Ask Jarvis Anything...";
@@ -425,7 +291,7 @@
 
         window.startVoiceInput = () => {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if(!SpeechRecognition) return alert("Web Speech engine unavailable.");
+            if(!SpeechRecognition) return alert("Speech recognition runtime matrix unavailable on this client browser device.");
             
             const recog = new SpeechRecognition();
             recog.lang = 'en-US';
@@ -433,7 +299,7 @@
             
             recog.onstart = () => {
                 micBtn.style.background = "#e74c3c"; 
-                document.getElementById('jarvis-input').placeholder = "Listening, sir...";
+                document.getElementById('jarvis-input').placeholder = "Listening to your voice parameters, sir...";
             };
 
             recog.onerror = () => { resetMicUI(); };
@@ -450,7 +316,7 @@
             recog.start();
         };
 
-        // ====================== FLOATING WIZARD CONTROLLER OPERATIONS ======================
+        // ====================== DRAGGABLE FLOATING WIZARD CONTROLLER OPERATIONS ======================
         window.toggleJarvisWizard = (expand) => {
             const orb = document.getElementById('jarvis-orb');
             const panel = document.getElementById('jarvis-panel');
@@ -568,7 +434,7 @@
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:2000; }
         .modal-content { background:white; padding:35px; border-radius:15px; width:90%; max-width:420px; text-align:center; }
         
-        /* ====================== FLOATING WIZARD COMPONENT LAYOUT STYLES ====================== */
+        /* ====================== DRAGGABLE WIZARD COMPONENT LAYOUT STYLES ====================== */
         .jarvis-wizard-wrapper {
             position: fixed;
             bottom: 30px;
@@ -609,7 +475,7 @@
             border-bottom: 1px solid rgba(255,255,255,0.1);
             cursor: move;
         }
-        .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 0.9rem; display:flex; align-items:center; gap: 6px;}
+        .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
         .jarvis-panel-actions { display: flex; gap: 8px; }
         .jarvis-panel-actions button {
             background: none; border: none; color: #bdc3c7; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; border-radius: 4px;
@@ -629,7 +495,6 @@
         }
         .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
-        #jarvis-ai-status { color: #bdc3c7; font-size: 0.75rem; margin-top: 8px; text-align: center; font-family: monospace; }
 
         @keyframes floatingPulse {
             0% { transform: translateY(0px); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4); }
@@ -707,23 +572,22 @@
 </div>
 
 <div class="jarvis-wizard-wrapper" id="jarvis-wizard-container">
-    <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)" title="Drag to move / Click to setup commands">🤖</div>
+    <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)" title="Drag to move / Click to configure dashboard setup">🤖</div>
     
     <div class="jarvis-panel" id="jarvis-panel">
-        <div class="jarvis-panel-header" id="jarvis-drag-header" title="Drag window layout box">
+        <div class="jarvis-panel-header" id="jarvis-drag-header" title="Drag window layout box wrapper">
             <h4>🔵 Jarvis Smart Core</h4>
             <div class="jarvis-panel-actions">
                 <button type="button" onclick="window.toggleJarvisWizard(false)" title="Minimize Wizard" style="font-weight: bold;">−</button>
-                <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()" title="Completely Turn Off Jarvis Wizard">✕</button>
+                <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()" title="Completely Hide Jarvis Wizard Dashboard Window">✕</button>
             </div>
         </div>
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
                 <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
-                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="startVoiceInput()" title="Voice Input">🎤</button>
-                <button type="button" class="jarvis-action-btn send-btn" onclick="sendJarvisCommand()" title="Send">➤</button>
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="startVoiceInput()" title="Voice Microphone Input Driver">🎤</button>
+                <button type="button" class="jarvis-action-btn send-btn" onclick="sendJarvisCommand()" title="Send Command Thread">➤</button>
             </div>
-            <div id="jarvis-ai-status">Jarvis Engine: Initializing...</div>
         </div>
     </div>
 </div>
