@@ -128,7 +128,8 @@
 
         window.toggleBulb = (n) => {
             if (!window.activeRoom) return alert("Select a device first");
-            const current = document.getElementById(`bulb${n}-status`).textContent === "ON";
+            const current = const el = document.getElementById(`bulb${n}-status`);
+const current = el && el.textContent === "ON";
             set(ref(db, `rooms/${window.activeRoom}/devices/${window.activeDevice}/states/bulb${n}`), !current);
         };
 
@@ -147,9 +148,17 @@
             document.querySelectorAll('.speed-btn').forEach((btn, i) => btn.classList.toggle('active', i === speed));
         }
 
-        document.getElementById('add-device-btn').onclick = () => { document.getElementById('modal').style.display = 'flex'; };
-        document.getElementById('close-modal').onclick = () => { document.getElementById('modal').style.display = 'none'; };
+        document.addEventListener("DOMContentLoaded", () => {
 
+    document.getElementById('add-device-btn').onclick = () => {
+        document.getElementById('modal').style.display = 'flex';
+    };
+
+    document.getElementById('close-modal').onclick = () => {
+        document.getElementById('modal').style.display = 'none';
+    };
+
+});
         window.addDevice = () => {
             const room = document.getElementById('room-id').value.trim(); const device = document.getElementById('device-id').value.trim();
             if (!room || !device) return alert("Please enter both Room ID and Device ID");
