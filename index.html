@@ -26,8 +26,9 @@
         let currentUser = null;
         let userDevicesList = []; 
 
-        // 🔑 YOUR ACTIVE OPENROUTER PARAMETER
+        // 🔑 YOUR ACTIVE SECURE KEY SIGNATURE SLOT
         const OPENROUTER_API_KEY = "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";
+
         window.activeRoom = null;
         window.activeDevice = null;
 
@@ -189,7 +190,7 @@
             
             const norm = text.toLowerCase();
 
-            // Hardware commands checker
+            // Hardware commands checker matrix
             const isOff = norm.includes("off") || norm.includes("stop") || norm.includes("turn off");
             const isOn = norm.includes("on") || norm.includes("start") || norm.includes("turn on");
             
@@ -241,8 +242,8 @@
                 }
             }
 
-            // Unrestricted Direct OpenRouter Interface
-            if (OPENROUTER_API_KEY === "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" || !OPENROUTER_API_KEY) {
+            // Unrestricted Direct OpenRouter Fetch Interface Architecture
+            if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_KEY_HERE" || !OPENROUTER_API_KEY) {
                 await jarvisSpeak("Sir, please verify your OpenRouter key parameter placement on line 31.");
                 input.disabled = false; input.placeholder = "Ask Jarvis Anything...";
                 return;
@@ -253,10 +254,11 @@
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${OPENROUTER_API_KEY.trim()}`
+                        'Authorization': `Bearer ${OPENROUTER_API_KEY.trim()}`,
+                        'HTTP-Referer': 'https://jogendradipeng11-png.github.io',
+                        'X-OpenRouter-Title': 'Jarvis Hub Engine'
                     },
                     body: JSON.stringify({
-                        // Swapping to a high-uptime free model that bypasses authorization blocks
                         model: "meta-llama/llama-3-8b-instruct:free", 
                         messages: [
                             { role: "system", content: "You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily." },
@@ -268,8 +270,8 @@
                 const data = await response.json();
                 
                 if (data.error) {
-                    console.error("OpenRouter Error:", data.error);
-                    await jarvisSpeak(`Sir, OpenRouter reports an error. ${data.error.message || "Please check key parameters."}`);
+                    console.error("OpenRouter Block Triggered:", data.error);
+                    await jarvisSpeak(`Sir, OpenRouter reports a routing error. ${data.error.message || "Please check key parameters."}`);
                     return;
                 }
 
