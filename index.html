@@ -26,7 +26,7 @@
         let currentUser = null;
         let userDevicesList = []; 
 
-        // 🔑 PASTE YOUR OPENROUTER API KEY DIRECTLY HERE
+        // 🔑 YOUR SECURITY KEY MATRIX LOADED SUCCESSFULLY
         const OPENROUTER_API_KEY = "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";
 
         window.activeRoom = null;
@@ -128,8 +128,8 @@
 
         window.toggleBulb = (n) => {
             if (!window.activeRoom) return alert("Select a device first");
-            const current = const el = document.getElementById(`bulb${n}-status`);
-const current = el && el.textContent === "ON";
+            const el = document.getElementById(`bulb${n}-status`);
+            const current = el && el.textContent === "ON";
             set(ref(db, `rooms/${window.activeRoom}/devices/${window.activeDevice}/states/bulb${n}`), !current);
         };
 
@@ -149,16 +149,14 @@ const current = el && el.textContent === "ON";
         }
 
         document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('add-device-btn').onclick = () => {
+                document.getElementById('modal').style.display = 'flex';
+            };
+            document.getElementById('close-modal').onclick = () => {
+                document.getElementById('modal').style.display = 'none';
+            };
+        });
 
-    document.getElementById('add-device-btn').onclick = () => {
-        document.getElementById('modal').style.display = 'flex';
-    };
-
-    document.getElementById('close-modal').onclick = () => {
-        document.getElementById('modal').style.display = 'none';
-    };
-
-});
         window.addDevice = () => {
             const room = document.getElementById('room-id').value.trim(); const device = document.getElementById('device-id').value.trim();
             if (!room || !device) return alert("Please enter both Room ID and Device ID");
@@ -181,7 +179,7 @@ const current = el && el.textContent === "ON";
             });
         }
 
-// ====================== DIRECT CORE CONTROLLER ======================
+        // ====================== DIRECT CORE CONTROLLER ======================
         window.sendJarvisCommand = async () => {
             const input = document.getElementById('jarvis-input'); 
             const text = input.value.trim();
@@ -256,10 +254,9 @@ const current = el && el.textContent === "ON";
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${OPENROUTER_API_KEY.trim()}` // Clean spaces automatically
+                        'Authorization': `Bearer ${OPENROUTER_API_KEY.trim()}`
                     },
                     body: JSON.stringify({
-                        // Swapping to the absolute newest fully open free Gemini model ID on OpenRouter
                         model: "google/gemini-2.5-flash:free", 
                         messages: [
                             { role: "system", content: "You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily." },
@@ -270,52 +267,12 @@ const current = el && el.textContent === "ON";
                 
                 const data = await response.json();
                 
-                // If OpenRouter rejects the key, it sends an error block instead of choices
                 if (data.error) {
-                    console.error("OpenRouter Error Message:", data.error);
-                    await jarvisSpeak(`Sir, OpenRouter reports an error. ${data.error.message || "Please check key limits."}`);
+                    console.error("OpenRouter Error:", data.error);
+                    await jarvisSpeak(`Sir, OpenRouter reports an error. ${data.error.message || "Please check key parameters."}`);
                     return;
                 }
 
-                if (data.choices?.[0]?.message?.content) {
-                    const aiReply = data.choices[0].message.content.trim();
-                    await jarvisSpeak(aiReply);
-                    input.value = '';
-                } else {
-                    await jarvisSpeak("API data packet structurally empty, sir.");
-                }
-            } catch (err) {
-                console.error(err);
-                await jarvisSpeak("Connection parameters offline, sir.");
-            } finally { 
-                input.disabled = false; input.placeholder = "Ask Jarvis Anything..."; input.focus(); 
-            }
-        };
-
-            // Unrestricted Direct OpenRouter Interface
-            if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_KEY_HERE" || !OPENROUTER_API_KEY) {
-                await jarvisSpeak("Sir, please verify your OpenRouter key parameter placement on line 31.");
-                input.disabled = false; input.placeholder = "Ask Jarvis Anything...";
-                return;
-            }
-
-            try {
-                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${OPENROUTER_API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: "google/gemini-2.5-flash:free", 
-                        messages: [
-                            { role: "system", content: "You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily." },
-                            { role: "user", content: text }
-                        ]
-                    })
-                });
-                
-                const data = await response.json();
                 if (data.choices?.[0]?.message?.content) {
                     const aiReply = data.choices[0].message.content.trim();
                     await jarvisSpeak(aiReply);
@@ -337,7 +294,7 @@ const current = el && el.textContent === "ON";
             const recog = new SpeechRecognition(); recog.lang = 'en-US';
             recog.onstart = () => { document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; document.getElementById('jarvis-input').placeholder = "Listening..."; };
             recog.onend = () => { document.getElementById("jarvis-mic-btn").style.background = "linear-gradient(135deg,#667eea,#764ba2)"; document.getElementById('jarvis-input').placeholder = "Ask Jarvis Anything..."; };
-            recog.onresult = e => { document.getElementById('jarvis-input').value = e.results[0][0].transcript; sendJarvisCommand(); };
+            recog.onresult = e => { document.getElementById('jarvis-input').value = e.results[0][0].transcript; window.sendJarvisCommand(); };
             recog.start();
         };
 
@@ -419,7 +376,6 @@ const current = el && el.textContent === "ON";
     </style>
 </head>
 <body>
-<!-- Rest of document layout holds static -->
 <div class="container">
     <div class="auth-container" id="auth-container">
         <div class="header"><h1>Smart Home</h1><p>Multi-Room Control Hub</p></div>
@@ -454,7 +410,7 @@ const current = el && el.textContent === "ON";
             <div id="control-panel">
                 <h2 id="control-title">Select a device</h2>
                 <div class="bulbs-grid">
-                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div> h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
