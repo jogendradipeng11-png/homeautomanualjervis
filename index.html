@@ -172,7 +172,7 @@
             });
         }
 
-        // ====================== DIRECT CORE CONTROLLER ======================
+// ====================== DIRECT CORE CONTROLLER ======================
         window.sendJarvisCommand = async () => {
             const input = document.getElementById('jarvis-input'); 
             const text = input.value.trim();
@@ -234,6 +234,54 @@
                     return;
                 }
             }
+
+            // Unrestricted Direct OpenRouter Interface
+            if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_KEY_HERE" || !OPENROUTER_API_KEY) {
+                await jarvisSpeak("Sir, please verify your OpenRouter key parameter placement on line 31.");
+                input.disabled = false; input.placeholder = "Ask Jarvis Anything...";
+                return;
+            }
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${OPENROUTER_API_KEY.trim()}` // Clean spaces automatically
+                    },
+                    body: JSON.stringify({
+                        // Swapping to the absolute newest fully open free Gemini model ID on OpenRouter
+                        model: "google/gemini-2.5-flash:free", 
+                        messages: [
+                            { role: "system", content: "You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily." },
+                            { role: "user", content: text }
+                        ]
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // If OpenRouter rejects the key, it sends an error block instead of choices
+                if (data.error) {
+                    console.error("OpenRouter Error Message:", data.error);
+                    await jarvisSpeak(`Sir, OpenRouter reports an error. ${data.error.message || "Please check key limits."}`);
+                    return;
+                }
+
+                if (data.choices?.[0]?.message?.content) {
+                    const aiReply = data.choices[0].message.content.trim();
+                    await jarvisSpeak(aiReply);
+                    input.value = '';
+                } else {
+                    await jarvisSpeak("API data packet structurally empty, sir.");
+                }
+            } catch (err) {
+                console.error(err);
+                await jarvisSpeak("Connection parameters offline, sir.");
+            } finally { 
+                input.disabled = false; input.placeholder = "Ask Jarvis Anything..."; input.focus(); 
+            }
+        };
 
             // Unrestricted Direct OpenRouter Interface
             if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_KEY_HERE" || !OPENROUTER_API_KEY) {
