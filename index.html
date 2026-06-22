@@ -32,6 +32,10 @@
         const ADMIN_EMAIL = "jogendra.dipeng11@gmail.com"; 
         const ADMIN_UID_PATH = "master_admin_global_core";
 
+        // 🌐 RENDER BACKEND CONFIGURATION
+        // Replace this with your actual live Render Web Service URL
+        const RENDER_BACKEND_URL = "https://your-backend-service.onrender.com/api/chat";
+
         window.activeRoom = null;
         window.activeDevice = null;
 
@@ -42,10 +46,8 @@
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
                 
-                // 🌐 Forced Open Fix: Ensures the Jarvis float window container is fully displayed upon login
                 document.getElementById('jarvis-wizard-container').style.display = 'block';
                 
-                // GLOBAL PUBLIC SYNC: All users pull the key from your central admin path
                 const keyRef = ref(db, `global_config/${ADMIN_UID_PATH}/key`);
                 onValue(keyRef, (snapshot) => {
                     const cloudKey = snapshot.val();
@@ -76,7 +78,6 @@
             }
         });
 
-        // 🔓 ADMIN-ONLY PASSWORD CHANNELS
         window.unlockKeyField = async () => {
             if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
                 alert("CRITICAL SECURITY VIOLATION: Only the system creator (jogendra.dipeng11@gmail.com) can modify this core key, sir.");
@@ -95,7 +96,7 @@
                 document.getElementById('sync-key-btn').style.display = 'inline-block';
                 document.getElementById('unlock-key-btn').style.display = 'none';
             } catch (err) {
-                alert("ACCESS DENIED: Authentication footprint mismatch. Security perimeter maintained.");
+                alert("ACCESS DENIED: Authentication footprint mismatch.");
             }
         };
 
@@ -107,7 +108,7 @@
             }
             
             const keyVal = document.getElementById('dashboard-gemini-key').value.trim();
-            if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key signature layout sequence, sir.");
+            if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key sequence, sir.");
             
             try {
                 await set(ref(db, `global_config/${ADMIN_UID_PATH}`), { key: keyVal });
@@ -298,7 +299,6 @@
             }
         };
 
-        // Standard single-shot microphone utility action click
         window.startVoiceInput = () => {
             if (isAlwaysListening) return; 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -373,6 +373,7 @@
                     }
                 }
 
+                // 🛑 BACKEND INTERACTION CHECK
                 if (!GLOBAL_SYSTEM_AI_KEY) {
                     await jarvisSpeak("Sir, the system core API key has not been deployed globally yet.");
                     return;
@@ -381,48 +382,30 @@
                 document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; 
                 document.getElementById('jarvis-input').placeholder = "Processing command, sir...";
 
-                // 🔒 NVIDIA INTEGRATION BACKLINK
-                // Replace your old Gemini fetch block with this OpenAI-compatible NVIDIA format:
+                // 🌐 NEW: Forwarding query payload straight to your Render backend link
                 try {
-                    // NVIDIA's global endpoint routing hub url
-                    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+                    const response = await fetch(RENDER_BACKEND_URL, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            // Pass your NVIDIA API Key (nvapi-xxxxxxxx) here
-                            'Authorization': `Bearer ${GLOBAL_SYSTEM_AI_KEY.trim()}` 
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            // Specify your chosen free model string from build.nvidia.com
-                            model: "nvidia/nemotron-3-ultra-550b-a55b", 
-                            messages: [
-                                { 
-                                    role: "system", 
-                                    content: "You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily." 
-                                },
-                                { 
-                                    role: "user", 
-                                    content: cleanCommand 
-                                }
-                            ],
-                            temperature: 0.7,
-                            max_tokens: 1024
+                            command: cleanCommand,
+                            key: GLOBAL_SYSTEM_AI_KEY.trim()
                         })
                     });
                     
                     const data = await response.json();
 
-                    // Read response from the OpenAI-standard choices layout array
-                    if (data.choices?.[0]?.message?.content) {
-                        const aiReply = data.choices[0].message.content.trim();
-                        await jarvisSpeak(aiReply);
+                    if (data.reply) {
+                        await jarvisSpeak(data.reply);
                         document.getElementById('jarvis-input').value = ""; 
+                    } else if (data.error) {
+                        await jarvisSpeak(`Sir, the backend returned an error: ${data.error}`);
                     } else {
-                        await jarvisSpeak("NVIDIA core processing stream returned empty, sir.");
+                        await jarvisSpeak("Core parameter stream loop empty, sir.");
                     }
                 } catch (err) {
                     console.error(err);
-                    await jarvisSpeak("NVIDIA server routing channels dropped offline, sir.");
+                    await jarvisSpeak("Backend channel dropped offline, sir.");
                 }
             }
         };
@@ -488,7 +471,6 @@
         .jarvis-wizard-wrapper { position: fixed; bottom: 30px; right: 30px; z-index: 5000; }
         .jarvis-orb { width: 65px; height: 65px; border-radius: 50%; background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4), inset 0 0 15px rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: move; transition: transform 0.2s ease; animation: floatingPulse 2s infinite ease-in-out; }
         
-        /* 🌐 Forced Visible Panel Default Styling Override Layout */
         .jarvis-panel { display: block; width: 340px; background: rgba(23, 32, 42, 0.96); border: 2px solid #00d2ff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
         .jarvis-panel-header { background: linear-gradient(135deg, #1c2833, #2c3e50); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: move; }
         .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
@@ -512,96 +494,3 @@
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="auth-container" id="auth-container">
-        <div class="header"><h1>Smart Home</h1><p>Multi-Room Control Hub</p></div>
-        <div class="form-container" id="login-form">
-            <div class="error-message" id="login-error"></div>
-            <div class="form-group"><input type="email" id="login-email" placeholder="Email Address"></div>
-            <div class="form-group"><input type="password" id="login-password" placeholder="Password"></div>
-            <button type="button" class="btn" onclick="login()">Login</button>
-            <div class="switch-form"><p>Need an account? <a onclick="showSignup()">Sign up</a></p></div>
-        </div>
-        <div class="form-container" id="signup-form" style="display:none;">
-            <div class="error-message" id="signup-error"></div>
-            <div class="form-group"><input type="email" id="signup-email" placeholder="Email Address"></div>
-            <div class="form-group"><input type="password" id="signup-password" placeholder="Password"></div>
-            <div class="form-group"><input type="password" id="signup-confirm-password" placeholder="Confirm Password"></div>
-            <button type="button" class="btn" onclick="signup()">Create Account</button>
-            <div class="switch-form"><p>Already registered? <a onclick="showLogin()">Login</a></p></div>
-        </div>
-    </div>
-
-    <div class="app-container" id="app-container" style="display:none;">
-        <div class="app-header">
-            <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
-            <button type="button" class="logout-btn" onclick="logout()">Logout</button>
-        </div>
-        <div class="controls">
-            
-            <div class="security-lockbox">
-                🔒 Global AI Core: <input type="password" id="dashboard-gemini-key" placeholder="Awaiting Central Deployment...">
-                <button type="button" id="unlock-key-btn" class="btn-unlock" onclick="window.unlockKeyField()">Modify Core</button>
-                <button type="button" id="sync-key-btn" onclick="window.saveSystemKey()">Sync Globally</button>
-            </div>
-
-            <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
-            <button type="button" class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
-            <button type="button" id="back-btn" onclick="goBack()">← Back to Device List</button>
-            <div id="device-list"></div>
-            
-            <div id="control-panel">
-                <h2 id="control-title">Select a device</h2>
-                <div class="bulbs-grid">
-                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
-                    <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
-                    <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
-                    <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
-                </div>
-                <div class="fan-control">
-                    <h3>Fan Speed Regulator</h3>
-                    <div class="speed-buttons">
-                        <button type="button" onclick="setFanSpeed(0)">OFF</button>
-                        <button type="button" onclick="setFanSpeed(1)">LOW</button>
-                        <button type="button" onclick="setFanSpeed(2)">MED</button>
-                        <button type="button" onclick="setFanSpeed(3)">HIGH</button>
-                    </div>
-                    <div class="status" id="fan-status">Current: OFF</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="modal">
-    <div class="modal-content">
-        <h2>Add New Smart Node</h2>
-        <div class="form-group"><input type="text" id="room-id" placeholder="Room ID (e.g., chintubedroom)"></div>
-        <div class="form-group"><input type="text" id="device-id" placeholder="Device Node ID (e.g., chintubedroom)"></div>
-        <button type="button" class="btn" onclick="addDevice()">Save and Connect</button>
-        <button type="button" class="btn" style="background:#6c757d; margin-top:10px;" id="close-modal">Cancel</button>
-    </div>
-</div>
-
-<div class="jarvis-wizard-wrapper" id="jarvis-wizard-container" style="display:none;">
-    <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)">🤖</div>
-    <div class="jarvis-panel" id="jarvis-panel">
-        <div class="jarvis-panel-header" id="jarvis-drag-header">
-            <h4>🔵 Jarvis Smart Core</h4>
-            <div class="jarvis-panel-actions">
-                <button type="button" onclick="window.toggleJarvisWizard(false)">−</button>
-                <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()">✕</button>
-            </div>
-        </div>
-        <div class="jarvis-panel-body">
-            <div class="jarvis-input-group">
-                <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
-                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.startVoiceInput()">🎤</button>
-                <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
-            </div>
-            <button type="button" class="jarvis-always-online-action" id="jarvis-always-online-btn" onclick="window.toggleAlwaysOnlineListening()">Go Always Online</button>
-        </div>
-    </div>
-</div>
-</body>
-</html>
