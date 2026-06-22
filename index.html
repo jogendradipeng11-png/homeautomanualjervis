@@ -257,25 +257,22 @@
             if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
         }
 
-        // ====================== 🔄 CLICK-TO-TOGGLE ACTIVE ALWAYS ONLINE MIC ======================
-        window.toggleVoiceListening = () => {
+        // ====================== 🔄 ALWAYS ONLINE CLICK-TO-TOGGLE LOOP ======================
+        window.startVoiceInput = () => {
             const micBtn = document.getElementById("jarvis-mic-btn");
-            const toggleOnlineBtn = document.getElementById("jarvis-online-toggle-btn");
             const currentInput = document.getElementById('jarvis-input');
 
             if (isAlwaysListening) {
                 isAlwaysListening = false;
                 if (recognition) { recognition.onend = null; recognition.stop(); }
                 micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; 
-                toggleOnlineBtn.textContent = "Go Online";
-                toggleOnlineBtn.style.background = "#0072ff";
                 currentInput.placeholder = "Ask Jarvis Anything...";
             } else {
                 isAlwaysListening = true;
                 if (!recognition) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     if (!SpeechRecognition) {
-                        alert("Speech engine unsupported on this browser profile.");
+                        alert("Speech recognition unavailable.");
                         isAlwaysListening = false;
                         return;
                     }
@@ -285,9 +282,7 @@
                     recognition.lang = 'en-US';
                 }
 
-                micBtn.style.background = "#2ecc71"; // Active green state matching your concept
-                toggleOnlineBtn.textContent = "Go Offline";
-                toggleOnlineBtn.style.background = "#e74c3c";
+                micBtn.style.background = "#2ecc71"; // Active green state
                 currentInput.placeholder = "Listening live for wake words...";
 
                 recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
@@ -470,17 +465,13 @@
         .jarvis-panel-body { padding: 15px; }
         .jarvis-input-group { display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e; }
         
-        /* Input remains 100% interactable at all times for manual writing */
+        /* Input remains 100% active for manual typing at any time */
         .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; pointer-events: auto; }
         .jarvis-input-group input:focus { outline: none; }
         
         .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
         .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
-        
-        /* Style for the dedicated Online Mode toggle switch element */
-        .online-toggle-btn { display: block; width: 100%; margin-top: 10px; padding: 8px; border: none; border-radius: 20px; background: #0072ff; color: white; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; transition: background 0.2s; }
-        
         @keyframes floatingPulse { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
     </style>
 </head>
@@ -569,10 +560,9 @@
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
                 <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
-                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.toggleVoiceListening()">🎤</button>
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.startVoiceInput()">🎤</button>
                 <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
-            <button type="button" class="online-toggle-btn" id="jarvis-online-toggle-btn" onclick="window.toggleVoiceListening()">Go Online</button>
         </div>
     </div>
 </div>
