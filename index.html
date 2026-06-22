@@ -63,7 +63,6 @@
                     document.getElementById('jarvis-wizard-container').style.display = 'block';
                 }
                 loadUserDevices();
-                // 🚀 Automatically initialize the continuous listening system upon login
                 initContinuousListening();
             } else {
                 currentUser = null;
@@ -222,7 +221,6 @@
         function jarvisSpeak(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) { resolve(); return; }
-                // 🛑 Temporarily pause recognition so Jarvis doesn't listen to his own voice speaking
                 if (recognition && isAlwaysListening) { recognition.onend = null; recognition.stop(); }
                 
                 window.speechSynthesis.cancel();
@@ -230,7 +228,6 @@
                 utterance.lang = 'en-US'; utterance.rate = 1.0; utterance.pitch = 0.95;
                 
                 utterance.onend = () => { 
-                    // 🔄 Restart continuous listening immediately after Jarvis completes his reply
                     if (isAlwaysListening) { setTimeout(startListeningLoop, 100); }
                     resolve(); 
                 };
@@ -245,12 +242,10 @@
         // ====================== 🔄 UNBREAKABLE ALWAYS-LISTENING LOOP ======================
         function initContinuousListening() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                console.error("Speech engine unsupported on this browser client architecture.");
-                return;
-            }
+            if (!SpeechRecognition) return;
+            
             recognition = new SpeechRecognition();
-            recognition.continuous = false; // Intermittent segment slicing for faster phrase analysis
+            recognition.continuous = false; 
             recognition.interimResults = false;
             recognition.lang = 'en-US';
 
@@ -261,22 +256,25 @@
         function startListeningLoop() {
             if (!isAlwaysListening || !recognition) return;
             
-            document.getElementById("jarvis-mic-btn").style.background = "#2ecc71"; // Green indicator means ambient listening mode active
-            document.getElementById('jarvis-input').placeholder = "Listening live for 'Hey Jarvis'...";
+            document.getElementById("jarvis-mic-btn").style.background = "#2ecc71"; 
+            
+            // 🌟 KEEP SPACE AVAILABLE: Leave placeholder open for manual text typing anytime
+            const currentInput = document.getElementById('jarvis-input');
+            if (currentInput.value === "") {
+                currentInput.placeholder = "Ask Jarvis or type here...";
+            }
 
-            recognition.onend = () => {
-                // Unbreakable chain link fallback: loop instantly revives if stopped by timeouts
-                if (isAlwaysListening) { startListeningLoop(); }
-            };
-
-            recognition.onerror = (e) => {
-                console.log("Audio pipeline recycle event:", e.error);
-                if (isAlwaysListening) { setTimeout(startListeningLoop, 50); }
-            };
+            recognition.onend = () => { if (isAlwaysListening) { startListeningLoop(); } };
+            recognition.onerror = (e) => { if (isAlwaysListening) { setTimeout(startListeningLoop, 50); } };
 
             recognition.onresult = (event) => {
                 const spokenText = event.results[0][0].transcript.trim();
-                document.getElementById('jarvis-input').value = spokenText;
+                const norm = spokenText.toLowerCase();
+
+                // 🌟 SMART WRITING SYNC: Only populate the box if a wake word is used
+                if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree")) {
+                    document.getElementById('jarvis-input').value = spokenText;
+                }
                 processVoiceMatrix(spokenText);
             };
 
@@ -287,9 +285,7 @@
         async function processVoiceMatrix(rawText) {
             const norm = rawText.toLowerCase();
             
-            // Check for targeted master activation wake expressions
             if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree")) {
-                // Strip wake expression to isolate raw target intent request
                 let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").trim();
                 
                 if (!cleanCommand) {
@@ -297,7 +293,6 @@
                     return;
                 }
 
-                // Path A: Switch control engine triggers (Writes directly to Firebase paths)
                 const isOff = cleanCommand.includes("off") || cleanCommand.includes("stop") || cleanCommand.includes("turn off");
                 const isOn = cleanCommand.includes("on") || cleanCommand.includes("start") || cleanCommand.includes("turn on");
                 
@@ -339,6 +334,7 @@
                         try {
                             await update(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states`), updates);
                             await jarvisSpeak(`Certainly sir. Adjusting your ${phraseDetail} parameters inside ${target.roomId} now.`);
+                            document.getElementById('jarvis-input').value = ""; // Clear text area after completion
                         } catch(err) {
                             await jarvisSpeak("Database sync block error, sir.");
                         }
@@ -346,13 +342,12 @@
                     }
                 }
 
-                // Path B: General Service Assistant Queries (Routes directly to Gemini 2.5 Cloud Brain)
                 if (!GLOBAL_SYSTEM_AI_KEY) {
                     await jarvisSpeak("Sir, cloud brain offline. Please hook administrative key elements first.");
                     return;
                 }
 
-                document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; // Red indicator means processing query
+                document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; 
                 document.getElementById('jarvis-input').placeholder = "Processing command, sir...";
 
                 try {
@@ -368,6 +363,7 @@
                     if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
                         const aiReply = data.candidates[0].content.parts[0].text.trim();
                         await jarvisSpeak(aiReply);
+                        document.getElementById('jarvis-input').value = ""; // Clear text area after completion
                     } else {
                         await jarvisSpeak("Core query matrix loop returned empty, sir.");
                     }
@@ -377,10 +373,13 @@
             }
         }
 
-        // Manual text send button functionality override
+        // 🌟 UNLOCKED SEND INTERACTION: Process custom manual text entries directly
         window.sendJarvisCommand = () => {
             const rawText = document.getElementById('jarvis-input').value.trim();
-            if(rawText) { processVoiceMatrix("Hey Jarvis " + rawText); }
+            if(rawText) { 
+                // Treat written text exactly like a voice command with the wake word included
+                processVoiceMatrix("Hey Jarvis " + rawText); 
+            }
         };
     </script>
     <style>
@@ -444,8 +443,11 @@
         .jarvis-panel-actions .power-off:hover { color: #e74c3c; }
         .jarvis-panel-body { padding: 15px; }
         .jarvis-input-group { display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e; }
-        .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; }
+        
+        /* 🌟 WRITING ALLOWANCE UNLOCKED: Input box is completely active for manual writing */
+        .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; pointer-events: auto; }
         .jarvis-input-group input:focus { outline: none; }
+        
         .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
         .mic-btn { background: #2ecc71; }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
@@ -494,7 +496,7 @@
             <div id="control-panel">
                 <h2 id="control-title">Select a device</h2>
                 <div class="bulbs-grid">
-                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div> h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
@@ -536,7 +538,7 @@
         </div>
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
-                <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
+                <input type="text" id="jarvis-input" placeholder="Ask Jarvis or type here...">
                 <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn">🎤</button>
                 <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
