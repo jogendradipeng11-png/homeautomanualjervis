@@ -257,47 +257,73 @@
         }
 
         // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
+        // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
         window.toggleAlwaysOnlineListening = () => {
             const onlineBtn = document.getElementById("jarvis-always-online-btn");
             const currentInput = document.getElementById('jarvis-input');
 
             if (isAlwaysListening) {
                 isAlwaysListening = false;
-                if (recognition) { recognition.onend = null; recognition.stop(); }
+                if (recognition) { 
+                    recognition.onend = null; 
+                    recognition.onerror = null;
+                    recognition.onresult = null;
+                    recognition.stop(); 
+                }
                 onlineBtn.textContent = "Go Always Online";
                 onlineBtn.style.background = "linear-gradient(135deg, #0072ff, #00c6ff)";
                 currentInput.placeholder = "Ask Jarvis Anything...";
             } else {
                 isAlwaysListening = true;
-                if (!recognition) {
-                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    if (!SpeechRecognition) {
-                        alert("Speech recognition engine unsupported on this client browser profile.");
-                        isAlwaysListening = false;
-                        return;
-                    }
-                    recognition = new SpeechRecognition();
-                    recognition.continuous = false;
-                    recognition.interimResults = false;
-                    recognition.lang = 'en-US';
+                
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert("Speech recognition engine unsupported on this client browser profile.");
+                    isAlwaysListening = false;
+                    return;
                 }
+                
+                if (!recognition) {
+                    recognition = new SpeechRecognition();
+                }
+                
+                // Unlocks continuous mic capture streaming
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
 
                 onlineBtn.textContent = "Always Online: ACTIVE";
                 onlineBtn.style.background = "#2ecc71"; 
                 currentInput.placeholder = "Listening for wake words...";
 
-                recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                recognition.onerror = (e) => { if (isAlwaysListening) { setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); } };
+                // Self-Healing Restart: Instantly re-opens the mic channel when it closes
+                recognition.onend = () => { 
+                    if (isAlwaysListening) { 
+                        try { recognition.start(); } catch(e){} 
+                    } 
+                };
+                
+                // Silent Error Handling: If mic gets quiet or times out, safely restart it
+                recognition.onerror = (e) => { 
+                    if (isAlwaysListening) { 
+                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 100); 
+                    } 
+                };
                 
                 recognition.onresult = (event) => {
-                    const spokenText = event.results[0][0].transcript.trim();
-                    processVoiceMatrix(spokenText);
+                    if (event.results && event.results[0]) {
+                        const spokenText = event.results[0][0].transcript.trim();
+                        processVoiceMatrix(spokenText);
+                    }
                 };
 
-                try { recognition.start(); } catch(e) {}
+                try { 
+                    recognition.start(); 
+                } catch(e) {
+                    console.log("Mic stream init: ", e);
+                }
             }
         };
-
         window.startVoiceInput = () => {
             if (isAlwaysListening) return; 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
