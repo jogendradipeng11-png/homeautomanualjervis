@@ -25,6 +25,7 @@
         const db = getDatabase(app);
         let currentUser = null;
         let userDevicesList = []; 
+        let GLOBAL_SYSTEM_AI_KEY = ""; // Holds the active validated cloud key string
 
         window.activeRoom = null;
         window.activeDevice = null;
@@ -36,11 +37,15 @@
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
                 
-                // Load key from secure local storage memory automatically
-                const savedKey = localStorage.getItem('secure_gemini_key');
-                if (savedKey) {
-                    document.getElementById('dashboard-gemini-key').value = savedKey;
-                }
+                // 🌐 WORLDWIDE SYNC: Automatically fetch your key from the Firebase Cloud
+                const keyRef = ref(db, `users/${currentUser.uid}/ai_security_core/key`);
+                onValue(keyRef, (snapshot) => {
+                    const cloudKey = snapshot.val();
+                    if (cloudKey) {
+                        GLOBAL_SYSTEM_AI_KEY = cloudKey;
+                        document.getElementById('dashboard-gemini-key').value = cloudKey;
+                    }
+                });
 
                 if (localStorage.getItem('jarvis-enabled') !== 'false') {
                     document.getElementById('jarvis-wizard-container').style.display = 'block';
@@ -49,18 +54,25 @@
             } else {
                 currentUser = null;
                 userDevicesList = [];
+                GLOBAL_SYSTEM_AI_KEY = "";
                 document.getElementById('auth-container').style.display = 'block';
                 document.getElementById('app-container').style.display = 'none';
                 document.getElementById('jarvis-wizard-container').style.display = 'none';
             }
         });
 
-        // Save Key to Private Browser Memory Vault
-        window.saveSystemKey = () => {
+        // 🔒 SECURE SAVE: Saves masked stars to the database cloud under your login profile
+        window.saveSystemKey = async () => {
+            if (!currentUser) return;
             const keyVal = document.getElementById('dashboard-gemini-key').value.trim();
             if(!keyVal) return alert("Please input a key signature string, sir.");
-            localStorage.setItem('secure_gemini_key', keyVal);
-            alert("System Core AI Key Signature Synchronized Successfully, Sir!");
+            
+            try {
+                await set(ref(db, `users/${currentUser.uid}/ai_security_core`), { key: keyVal });
+                alert("System Core AI Key Signature Synchronized to the Cloud, Sir!");
+            } catch (err) {
+                alert("Database sync fault: " + err.message);
+            }
         };
 
         window.login = async () => {
@@ -197,10 +209,9 @@
             const text = input.value.trim();
             if(!text) return;
             
-            // Extract the Key directly from Local Storage
-            const SYSTEM_AI_KEY = localStorage.getItem('secure_gemini_key');
-            if (!SYSTEM_AI_KEY) {
-                await jarvisSpeak("Sir, please assign your system core API key using the security input field above first.");
+            // 🌐 PULLED FROM SECURE CLOUD ENVELOPE DYNAMICALLY
+            if (!GLOBAL_SYSTEM_AI_KEY) {
+                await jarvisSpeak("Sir, please assign your system core API key using the secure lockbox above first.");
                 return;
             }
 
@@ -262,8 +273,8 @@
             }
 
             try {
-                // Fixed stable model generation endpoint routing parameter layout
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${SYSTEM_AI_KEY.trim()}`, {
+                // Fixed stable 2.5 production matrix link endpoint
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GLOBAL_SYSTEM_AI_KEY.trim()}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -336,9 +347,10 @@
         .logout-btn { background:#e74c3c; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; font-weight: bold; }
         .controls { padding:30px; }
         
-        .security-lockbox { background:#fff3cd; border: 1px solid #ffeeba; border-radius:12px; padding:15px; margin-bottom:20px; display:flex; gap:10px; align-items:center; }
-        .security-lockbox input { flex:1; padding:10px; border:1px solid #ced4da; border-radius:8px; font-size:14px; }
-        .security-lockbox button { padding:10px 20px; background:#ffc107; color:#212529; border:none; border-radius:8px; font-weight:bold; cursor:pointer; }
+        .security-lockbox { background:#e2e3e5; border: 1px solid #ced4da; border-radius:12px; padding:15px; margin-bottom:20px; display:flex; gap:10px; align-items:center; }
+        .security-lockbox input { flex:1; padding:10px; border:1px solid #ced4da; border-radius:8px; font-size:14px; background: #ffffff; color: #212529; }
+        .security-lockbox button { padding:10px 20px; background:#6c757d; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; transition: background 0.2s; }
+        .security-lockbox button:hover { background: #5a6268; }
         
         #add-device-btn { width:auto; padding:14px 30px; display:inline-block; margin-bottom:20px; margin-right:10px; }
         #re-enable-jarvis-btn { width:auto; padding:14px 30px; display:none; margin-bottom:20px; background:linear-gradient(135deg, #11998e, #38ef7d); }
@@ -412,8 +424,8 @@
         <div class="controls">
             
             <div class="security-lockbox">
-                🔑 <input type="password" id="dashboard-gemini-key" placeholder="Paste Your Google AI Studio Gemini API Key Here...">
-                <button type="button" onclick="window.saveSystemKey()">Save Key</button>
+                🛡️ Key Sync: <input type="password" id="dashboard-gemini-key" placeholder="Enter Gemini Key (Hides as Stars Automatically)...">
+                <button type="button" onclick="window.saveSystemKey()">Sync to Cloud</button>
             </div>
 
             <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
