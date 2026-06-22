@@ -233,31 +233,45 @@
 
         window.removeDevice = (id) => { if (confirm("Remove this device from your list?")) remove(ref(db, `users/${currentUser.uid}/devices/${id}`)); };
 
-        function jarvisSpeak(text) {
+function jarvisSpeak(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) { resolve(); return; }
-                if (recognition && isAlwaysListening) { recognition.onend = null; recognition.stop(); }
+                
+                // 🔒 Lock Microphone: Stop listening so Jarvis doesn't hear his own voice
+                if (recognition) { 
+                    recognition.onend = null; // Prevent the auto-restart loop from firing mid-speech
+                    recognition.stop(); 
+                }
+                
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US'; utterance.rate = 1.0; utterance.pitch = 0.95;
+                
                 utterance.onend = () => {
-                    if (isAlwaysListening) { setTimeout(executeMicResume, 200); }
+                    // 🔓 Unlock Microphone: Turn continuous listening back on instantly when Jarvis stops talking
+                    if (isAlwaysListening && recognition) { 
+                        recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 150); 
+                    }
                     resolve();
                 };
+                
                 utterance.onerror = () => {
-                    if (isAlwaysListening) { setTimeout(executeMicResume, 200); }
+                    if (isAlwaysListening && recognition) { 
+                        recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 150); 
+                    }
                     resolve();
                 };
+                
                 window.speechSynthesis.speak(utterance);
             });
         }
-
         function executeMicResume() {
             if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
         }
 
-        // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
-        // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
+// ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
         window.toggleAlwaysOnlineListening = () => {
             const onlineBtn = document.getElementById("jarvis-always-online-btn");
             const currentInput = document.getElementById('jarvis-input');
@@ -287,7 +301,7 @@
                     recognition = new SpeechRecognition();
                 }
                 
-                // 🔓 CRITICAL CHANGE: Tells the browser to keep the microphone open permanently!
+                // Keep stream structurally active for open voice capture
                 recognition.continuous = true;
                 recognition.interimResults = false;
                 recognition.lang = 'en-US';
@@ -296,7 +310,7 @@
                 onlineBtn.style.background = "#2ecc71"; 
                 currentInput.placeholder = "Listening live for wake words...";
 
-                // Safety Loop: If the browser forces the mic to close for any reason, wake it back up instantly
+                // Self-healing loop when resting
                 recognition.onend = () => { 
                     if (isAlwaysListening) { 
                         try { recognition.start(); } catch(e){} 
@@ -310,13 +324,11 @@
                     } 
                 };
                 
-                // Continuous Processing Matrix
                 recognition.onresult = (event) => {
-                    // Grab the absolute latest sentence spoken by the user from the ongoing stream
                     const currentResultIndex = event.resultIndex;
                     if (event.results && event.results[currentResultIndex]) {
                         const spokenText = event.results[currentResultIndex][0].transcript.trim();
-                        console.log("Jarvis heard sentence: ", spokenText);
+                        console.log("Jarvis captured: ", spokenText);
                         processVoiceMatrix(spokenText);
                     }
                 };
