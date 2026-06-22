@@ -26,9 +26,6 @@
         let currentUser = null;
         let userDevicesList = []; 
 
-        // 🔑 THE AUTOMATED GITHUB WORKFLOW WILL SAFELY INJECT YOUR SECRET HERE
-        const GEMINI_API_KEY = "REPLACE_WITH_API_KEY";
-
         window.activeRoom = null;
         window.activeDevice = null;
 
@@ -38,6 +35,13 @@
                 document.getElementById('user-name').textContent = user.email.split('@')[0];
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
+                
+                // Initialize Secure Key Input UI State
+                const savedKey = localStorage.getItem('secure_gemini_key');
+                if (savedKey) {
+                    document.getElementById('dashboard-gemini-key').value = savedKey;
+                }
+
                 if (localStorage.getItem('jarvis-enabled') !== 'false') {
                     document.getElementById('jarvis-wizard-container').style.display = 'block';
                 }
@@ -50,6 +54,14 @@
                 document.getElementById('jarvis-wizard-container').style.display = 'none';
             }
         });
+
+        // Save Key to Private Browser Memory Vault
+        window.saveSystemKey = () => {
+            const keyVal = document.getElementById('dashboard-gemini-key').value.trim();
+            if(!keyVal) return alert("Please input a key signature string, sir.");
+            localStorage.setItem('secure_gemini_key', keyVal);
+            alert("System Core AI Key Signature Synchronized Successfully, Sir!");
+        };
 
         window.login = async () => {
             const email = document.getElementById('login-email').value.trim();
@@ -185,6 +197,13 @@
             const text = input.value.trim();
             if(!text) return;
             
+            // Extract the Key directly from Secure Browser Storage
+            const SYSTEM_AI_KEY = localStorage.getItem('secure_gemini_key');
+            if (!SYSTEM_AI_KEY) {
+                await jarvisSpeak("Sir, please assign your system core API key using the security input field above first.");
+                return;
+            }
+
             input.disabled = true; 
             input.placeholder = "Processing command, sir...";
             
@@ -242,14 +261,8 @@
                 }
             }
 
-            if (GEMINI_API_KEY === "REPLACE_WITH_API_KEY" || !GEMINI_API_KEY || GEMINI_API_KEY.includes("REPLACE")) {
-                await jarvisSpeak("Sir, please verify your GitHub Secret automation sequence pipeline settings.");
-                input.disabled = false; input.placeholder = "Ask Jarvis Anything...";
-                return;
-            }
-
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${SYSTEM_AI_KEY.trim()}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -264,8 +277,8 @@
                     await jarvisSpeak(aiReply);
                     input.value = '';
                 } else if (data.error) {
-                    console.error("Google API Security Halt:", data.error);
-                    await jarvisSpeak(`Sir, Google reports an issue: ${data.error.message || "Token structure restriction."}`);
+                    console.error("Google AI Studio Link Issue:", data.error);
+                    await jarvisSpeak(`Sir, the AI channel returned an error. ${data.error.message || "Please verify key parameters."}`);
                 } else {
                     await jarvisSpeak("Core parameter stream loop empty, sir.");
                 }
@@ -321,6 +334,12 @@
         .app-header { background:linear-gradient(135deg,#2c3e50,#34495e); color:white; padding:20px 30px; display:flex; justify-content:space-between; align-items:center; }
         .logout-btn { background:#e74c3c; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; font-weight: bold; }
         .controls { padding:30px; }
+        
+        /* Secure Key Locker UI Layout Styling */
+        .security-lockbox { background:#fff3cd; border: 1px solid #ffeeba; border-radius:12px; padding:15px; margin-bottom:20px; display:flex; gap:10px; align-items:center; }
+        .security-lockbox input { flex:1; padding:10px; border:1px solid #ced4da; border-radius:8px; font-size:14px; }
+        .security-lockbox button { padding:10px 20px; background:#ffc107; color:#212529; border:none; border-radius:8px; font-weight:bold; cursor:pointer; }
+        
         #add-device-btn { width:auto; padding:14px 30px; display:inline-block; margin-bottom:20px; margin-right:10px; }
         #re-enable-jarvis-btn { width:auto; padding:14px 30px; display:none; margin-bottom:20px; background:linear-gradient(135deg, #11998e, #38ef7d); }
         #device-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; margin-top:20px; }
@@ -391,6 +410,12 @@
             <button type="button" class="logout-btn" onclick="logout()">Logout</button>
         </div>
         <div class="controls">
+            
+            <div class="security-lockbox">
+                🔑 <input type="password" id="dashboard-gemini-key" placeholder="Paste Your Google AI Studio Gemini API Key Here...">
+                <button type="button" onclick="window.saveSystemKey()">Save Key</button>
+            </div>
+
             <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
             <button type="button" class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
             <button type="button" id="back-btn" onclick="goBack()">← Back to Device List</button>
