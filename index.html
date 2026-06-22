@@ -287,21 +287,47 @@
                     recognition = new SpeechRecognition();
                 }
                 
-                // Unlocks continuous mic capture streaming
-                recognition.continuous = false;
+                // 🔓 CRITICAL CHANGE: Tells the browser to keep the microphone open permanently!
+                recognition.continuous = true;
                 recognition.interimResults = false;
                 recognition.lang = 'en-US';
 
                 onlineBtn.textContent = "Always Online: ACTIVE";
                 onlineBtn.style.background = "#2ecc71"; 
-                currentInput.placeholder = "Listening for wake words...";
+                currentInput.placeholder = "Listening live for wake words...";
 
-                // Self-Healing Restart: Instantly re-opens the mic channel when it closes
+                // Safety Loop: If the browser forces the mic to close for any reason, wake it back up instantly
                 recognition.onend = () => { 
                     if (isAlwaysListening) { 
                         try { recognition.start(); } catch(e){} 
                     } 
                 };
+                
+                recognition.onerror = (e) => { 
+                    console.log("Jarvis Mic Alert: ", e.error);
+                    if (isAlwaysListening && e.error !== 'not-allowed') { 
+                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 100); 
+                    } 
+                };
+                
+                // Continuous Processing Matrix
+                recognition.onresult = (event) => {
+                    // Grab the absolute latest sentence spoken by the user from the ongoing stream
+                    const currentResultIndex = event.resultIndex;
+                    if (event.results && event.results[currentResultIndex]) {
+                        const spokenText = event.results[currentResultIndex][0].transcript.trim();
+                        console.log("Jarvis heard sentence: ", spokenText);
+                        processVoiceMatrix(spokenText);
+                    }
+                };
+
+                try { 
+                    recognition.start(); 
+                } catch(e) {
+                    console.log("Mic stream init: ", e);
+                }
+            }
+        };
                 
                 // Silent Error Handling: If mic gets quiet or times out, safely restart it
                 recognition.onerror = (e) => { 
