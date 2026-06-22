@@ -44,7 +44,6 @@
                 document.getElementById('user-name').textContent = user.email.split('@')[0];
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
-                
                 document.getElementById('jarvis-wizard-container').style.display = 'block';
                 
                 const keyRef = ref(db, `global_config/${ADMIN_UID_PATH}/key`);
@@ -105,10 +104,8 @@
                 alert("ACCESS DENIED: Administrative write privileges required.");
                 return;
             }
-            
             const keyVal = document.getElementById('dashboard-gemini-key').value.trim();
             if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key sequence, sir.");
-            
             try {
                 await set(ref(db, `global_config/${ADMIN_UID_PATH}`), { key: keyVal });
                 alert("System Core AI Key Signature Synchronized Globally, Sir!");
@@ -183,7 +180,9 @@
             onValue(ref(db, `rooms/${room}/devices/${device}/states`), (snap) => {
                 const s = snap.val() || {};
                 [1,2,3,4].forEach(i => updateBulb(i, !!s[`bulb${i}`]));
-                updateFan(s.fanSpeed ?? 0);
+                onValue(ref(db, `rooms/${room}/devices/${device}/states/fanSpeed`), (fsnap) => {
+                     updateFan(fsnap.val() ?? 0);
+                });
             });
         };
 
@@ -215,12 +214,8 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById('add-device-btn').onclick = () => {
-                document.getElementById('modal').style.display = 'flex';
-            };
-            document.getElementById('close-modal').onclick = () => {
-                document.getElementById('modal').style.display = 'none';
-            };
+            document.getElementById('add-device-btn').onclick = () => { document.getElementById('modal').style.display = 'flex'; };
+            document.getElementById('close-modal').onclick = () => { document.getElementById('modal').style.display = 'none'; };
         });
 
         window.addDevice = () => {
@@ -233,13 +228,14 @@
 
         window.removeDevice = (id) => { if (confirm("Remove this device from your list?")) remove(ref(db, `users/${currentUser.uid}/devices/${id}`)); };
 
-function jarvisSpeak(text) {
+        // ====================== 🔊 AUDIO TTS ENGINE CONTROL LAYER ======================
+        function jarvisSpeak(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) { resolve(); return; }
                 
-                // 🔒 Lock Microphone: Stop listening so Jarvis doesn't hear his own voice
+                // 🔒 Lock Microphone: Pause continuous listener so Jarvis doesn't hear his own voice
                 if (recognition) { 
-                    recognition.onend = null; // Prevent the auto-restart loop from firing mid-speech
+                    recognition.onend = null; 
                     recognition.stop(); 
                 }
                 
@@ -248,7 +244,7 @@ function jarvisSpeak(text) {
                 utterance.lang = 'en-US'; utterance.rate = 1.0; utterance.pitch = 0.95;
                 
                 utterance.onend = () => {
-                    // 🔓 Unlock Microphone: Turn continuous listening back on instantly when Jarvis stops talking
+                    // 🔓 Unlock Microphone: Re-enable the continuous voice track loop on complete reply
                     if (isAlwaysListening && recognition) { 
                         recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
                         setTimeout(() => { try { recognition.start(); } catch(e){} }, 150); 
@@ -267,11 +263,8 @@ function jarvisSpeak(text) {
                 window.speechSynthesis.speak(utterance);
             });
         }
-        function executeMicResume() {
-            if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
-        }
 
-// ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
+        // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
         window.toggleAlwaysOnlineListening = () => {
             const onlineBtn = document.getElementById("jarvis-always-online-btn");
             const currentInput = document.getElementById('jarvis-input');
@@ -297,11 +290,8 @@ function jarvisSpeak(text) {
                     return;
                 }
                 
-                if (!recognition) {
-                    recognition = new SpeechRecognition();
-                }
+                if (!recognition) { recognition = new SpeechRecognition(); }
                 
-                // Keep stream structurally active for open voice capture
                 recognition.continuous = true;
                 recognition.interimResults = false;
                 recognition.lang = 'en-US';
@@ -310,13 +300,7 @@ function jarvisSpeak(text) {
                 onlineBtn.style.background = "#2ecc71"; 
                 currentInput.placeholder = "Listening live for wake words...";
 
-                // Self-healing loop when resting
-                recognition.onend = () => { 
-                    if (isAlwaysListening) { 
-                        try { recognition.start(); } catch(e){} 
-                    } 
-                };
-                
+                recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
                 recognition.onerror = (e) => { 
                     console.log("Jarvis Mic Alert: ", e.error);
                     if (isAlwaysListening && e.error !== 'not-allowed') { 
@@ -333,35 +317,10 @@ function jarvisSpeak(text) {
                     }
                 };
 
-                try { 
-                    recognition.start(); 
-                } catch(e) {
-                    console.log("Mic stream init: ", e);
-                }
+                try { recognition.start(); } catch(e) {}
             }
         };
-                
-                // Silent Error Handling: If mic gets quiet or times out, safely restart it
-                recognition.onerror = (e) => { 
-                    if (isAlwaysListening) { 
-                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 100); 
-                    } 
-                };
-                
-                recognition.onresult = (event) => {
-                    if (event.results && event.results[0]) {
-                        const spokenText = event.results[0][0].transcript.trim();
-                        processVoiceMatrix(spokenText);
-                    }
-                };
 
-                try { 
-                    recognition.start(); 
-                } catch(e) {
-                    console.log("Mic stream init: ", e);
-                }
-            }
-        };
         window.startVoiceInput = () => {
             if (isAlwaysListening) return; 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -376,13 +335,10 @@ function jarvisSpeak(text) {
         // ====================== 🧠 PASSIVE WAKE-WORD & DUAL-BRAIN MATRIX ======================
         async function processVoiceMatrix(rawText) {
             const norm = rawText.toLowerCase();
-            
-            // ANTI-NOISE FILTER: Ignore short accidental mic clicks to protect the quota
             if (rawText.length < 4) return;
             
             if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree") || norm.startsWith("hey jogi") || norm.startsWith("jogi")) {
                 let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").replace("hey jogi", "").replace("jogi", "").trim();
-                
                 document.getElementById('jarvis-input').value = rawText;
 
                 if (!cleanCommand) {
@@ -451,14 +407,10 @@ function jarvisSpeak(text) {
                     const response = await fetch(RENDER_BACKEND_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            command: cleanCommand,
-                            key: GLOBAL_SYSTEM_AI_KEY.trim()
-                        })
+                        body: JSON.stringify({ command: cleanCommand, key: GLOBAL_SYSTEM_AI_KEY.trim() })
                     });
                     
                     const data = await response.json();
-
                     if (data.reply) {
                         await jarvisSpeak(data.reply);
                         document.getElementById('jarvis-input').value = ""; 
@@ -477,11 +429,28 @@ function jarvisSpeak(text) {
         window.sendJarvisCommand = () => {
             const rawInput = document.getElementById('jarvis-input');
             const rawText = rawInput.value.trim();
-            
-            // ANTI-SEND FILTER: Do not process empty inputs or status placeholders
             if(!rawText || rawText === "Listening for wake words..." || rawText === "Processing command, sir...") return;
-            
             processVoiceMatrix("Hey Jarvis " + rawText); 
+        };
+
+        // ====================== 🤖 INTERACTIVE PANEL WIZARD UI FUNCTIONS ======================
+        window.toggleJarvisWizard = (show) => {
+            const panel = document.getElementById('jarvis-panel');
+            const orb = document.getElementById('jarvis-orb');
+            if (show) { panel.style.display = 'block'; orb.style.display = 'none'; } 
+            else { panel.style.display = 'none'; orb.style.display = 'flex'; }
+        };
+
+        window.activateJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'block';
+            window.toggleJarvisWizard(true);
+            document.getElementById('re-enable-jarvis-btn').style.display = 'none';
+        };
+
+        window.turnOffJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'none';
+            document.getElementById('re-enable-jarvis-btn').style.display = 'inline-block';
+            if (isAlwaysListening) window.toggleAlwaysOnlineListening();
         };
     </script>
     <style>
@@ -538,7 +507,6 @@ function jarvisSpeak(text) {
         .jarvis-wizard-wrapper { position: fixed; bottom: 30px; right: 30px; z-index: 5000; }
         .jarvis-orb { width: 65px; height: 65px; border-radius: 50%; background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4), inset 0 0 15px rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: move; transition: transform 0.2s ease; animation: floatingPulse 2s infinite ease-in-out; }
         
-        /* Forced Visible Panel Layout styling configuration */
         .jarvis-panel { display: block; width: 340px; background: rgba(23, 32, 42, 0.96); border: 2px solid #00d2ff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
         .jarvis-panel-header { background: linear-gradient(135deg, #1c2833, #2c3e50); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: move; }
         .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
