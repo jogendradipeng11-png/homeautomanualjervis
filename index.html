@@ -32,9 +32,8 @@
         const ADMIN_EMAIL = "jogendra.dipeng11@gmail.com"; 
         const ADMIN_UID_PATH = "master_admin_global_core";
 
-        // 🌐 RENDER BACKEND CONFIGURATION
-        // Replace this with your actual live Render Web Service URL
-        const RENDER_BACKEND_URL = "https://jarvis-brain-core.onrender.com";
+        // 🌐 TARGET RENDER BACKEND ROUTING ENDPOINT
+        const RENDER_BACKEND_URL = "https://jarvis-brain-core.onrender.com/api/chat";
 
         window.activeRoom = null;
         window.activeDevice = null;
@@ -314,6 +313,9 @@
         async function processVoiceMatrix(rawText) {
             const norm = rawText.toLowerCase();
             
+            // ANTI-NOISE FILTER: Ignore short accidental mic clicks to protect the quota
+            if (rawText.length < 4) return;
+            
             if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree") || norm.startsWith("hey jogi") || norm.startsWith("jogi")) {
                 let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").replace("hey jogi", "").replace("jogi", "").trim();
                 
@@ -373,7 +375,6 @@
                     }
                 }
 
-                // 🛑 BACKEND INTERACTION CHECK
                 if (!GLOBAL_SYSTEM_AI_KEY) {
                     await jarvisSpeak("Sir, the system core API key has not been deployed globally yet.");
                     return;
@@ -382,7 +383,6 @@
                 document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; 
                 document.getElementById('jarvis-input').placeholder = "Processing command, sir...";
 
-                // 🌐 NEW: Forwarding query payload straight to your Render backend link
                 try {
                     const response = await fetch(RENDER_BACKEND_URL, {
                         method: 'POST',
@@ -408,13 +408,16 @@
                     await jarvisSpeak("Backend channel dropped offline, sir.");
                 }
             }
-        };
+        }
 
         window.sendJarvisCommand = () => {
-            const rawText = document.getElementById('jarvis-input').value.trim();
-            if(rawText) { 
-                processVoiceMatrix("Hey Jarvis " + rawText); 
-            }
+            const rawInput = document.getElementById('jarvis-input');
+            const rawText = rawInput.value.trim();
+            
+            // ANTI-SEND FILTER: Do not process empty inputs or status placeholders
+            if(!rawText || rawText === "Listening for wake words..." || rawText === "Processing command, sir...") return;
+            
+            processVoiceMatrix("Hey Jarvis " + rawText); 
         };
     </script>
     <style>
@@ -471,6 +474,7 @@
         .jarvis-wizard-wrapper { position: fixed; bottom: 30px; right: 30px; z-index: 5000; }
         .jarvis-orb { width: 65px; height: 65px; border-radius: 50%; background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4), inset 0 0 15px rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: move; transition: transform 0.2s ease; animation: floatingPulse 2s infinite ease-in-out; }
         
+        /* Forced Visible Panel Layout styling configuration */
         .jarvis-panel { display: block; width: 340px; background: rgba(23, 32, 42, 0.96); border: 2px solid #00d2ff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
         .jarvis-panel-header { background: linear-gradient(135deg, #1c2833, #2c3e50); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: move; }
         .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
@@ -494,3 +498,96 @@
     </style>
 </head>
 <body>
+<div class="container">
+    <div class="auth-container" id="auth-container">
+        <div class="header"><h1>Smart Home</h1><p>Multi-Room Control Hub</p></div>
+        <div class="form-container" id="login-form">
+            <div class="error-message" id="login-error"></div>
+            <div class="form-group"><input type="email" id="login-email" placeholder="Email Address"></div>
+            <div class="form-group"><input type="password" id="login-password" placeholder="Password"></div>
+            <button type="button" class="btn" onclick="login()">Login</button>
+            <div class="switch-form"><p>Need an account? <a onclick="showSignup()">Sign up</a></p></div>
+        </div>
+        <div class="form-container" id="signup-form" style="display:none;">
+            <div class="error-message" id="signup-error"></div>
+            <div class="form-group"><input type="email" id="signup-email" placeholder="Email Address"></div>
+            <div class="form-group"><input type="password" id="signup-password" placeholder="Password"></div>
+            <div class="form-group"><input type="password" id="signup-confirm-password" placeholder="Confirm Password"></div>
+            <button type="button" class="btn" onclick="signup()">Create Account</button>
+            <div class="switch-form"><p>Already registered? <a onclick="showLogin()">Login</a></p></div>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" style="display:none;">
+        <div class="app-header">
+            <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
+            <button type="button" class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+        <div class="controls">
+            
+            <div class="security-lockbox">
+                🔒 Global AI Core: <input type="password" id="dashboard-gemini-key" placeholder="Awaiting Central Deployment...">
+                <button type="button" id="unlock-key-btn" class="btn-unlock" onclick="window.unlockKeyField()">Modify Core</button>
+                <button type="button" id="sync-key-btn" onclick="window.saveSystemKey()">Sync Globally</button>
+            </div>
+
+            <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
+            <button type="button" class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
+            <button type="button" id="back-btn" onclick="goBack()">← Back to Device List</button>
+            <div id="device-list"></div>
+            
+            <div id="control-panel">
+                <h2 id="control-title">Select a device</h2>
+                <div class="bulbs-grid">
+                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
+                </div>
+                <div class="fan-control">
+                    <h3>Fan Speed Regulator</h3>
+                    <div class="speed-buttons">
+                        <button type="button" onclick="setFanSpeed(0)">OFF</button>
+                        <button type="button" onclick="setFanSpeed(1)">LOW</button>
+                        <button type="button" onclick="setFanSpeed(2)">MED</button>
+                        <button type="button" onclick="setFanSpeed(3)">HIGH</button>
+                    </div>
+                    <div class="status" id="fan-status">Current: OFF</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal">
+    <div class="modal-content">
+        <h2>Add New Smart Node</h2>
+        <div class="form-group"><input type="text" id="room-id" placeholder="Room ID (e.g., chintubedroom)"></div>
+        <div class="form-group"><input type="text" id="device-id" placeholder="Device Node ID (e.g., chintubedroom)"></div>
+        <button type="button" class="btn" onclick="addDevice()">Save and Connect</button>
+        <button type="button" class="btn" style="background:#6c757d; margin-top:10px;" id="close-modal">Cancel</button>
+    </div>
+</div>
+
+<div class="jarvis-wizard-wrapper" id="jarvis-wizard-container" style="display:none;">
+    <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)">🤖</div>
+    <div class="jarvis-panel" id="jarvis-panel">
+        <div class="jarvis-panel-header" id="jarvis-drag-header">
+            <h4>🔵 Jarvis Smart Core</h4>
+            <div class="jarvis-panel-actions">
+                <button type="button" onclick="window.toggleJarvisWizard(false)">−</button>
+                <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()">✕</button>
+            </div>
+        </div>
+        <div class="jarvis-panel-body">
+            <div class="jarvis-input-group">
+                <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.startVoiceInput()">🎤</button>
+                <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
+            </div>
+            <button type="button" class="jarvis-always-online-action" id="jarvis-always-online-btn" onclick="window.toggleAlwaysOnlineListening()">Go Always Online</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
