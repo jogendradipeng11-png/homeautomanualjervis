@@ -27,8 +27,10 @@
         let userDevicesList = []; 
         let GLOBAL_SYSTEM_AI_KEY = ""; 
 
-        // 🔒 MANDATORY SECURITY PARAMETER: Hardcoded Administrative Footprint
-        const ADMIN_EMAIL = "jogendradipeng11@gmail.com"; 
+        // 🔒 MASTER GLOBAL ADMIN EMAIL
+        const ADMIN_EMAIL = "jogendra.dipeng11@gmail.com"; 
+        // Admin UID placeholder used to build a fixed global path for all users to read from
+        const ADMIN_UID_PATH = "master_admin_global_core";
 
         window.activeRoom = null;
         window.activeDevice = null;
@@ -40,8 +42,8 @@
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
                 
-                // 🌐 WORLDWIDE SYNC: Pull hidden parameters securely from database
-                const keyRef = ref(db, `users/${currentUser.uid}/ai_security_core/key`);
+                // 🌐 GLOBAL PUBLIC SYNC: All users pull the key from your central admin path
+                const keyRef = ref(db, `global_config/${ADMIN_UID_PATH}/key`);
                 onValue(keyRef, (snapshot) => {
                     const cloudKey = snapshot.val();
                     if (cloudKey) {
@@ -72,11 +74,10 @@
             }
         });
 
-        // 🔒 STRICT ADMINISTRATIVE PASSWORD GATEWAY
+        // 🔓 ADMIN-ONLY PASSWORD CHANNELS
         window.unlockKeyField = async () => {
-            // Check 1: Verify if the currently active profile session matches the master admin email
             if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-                alert("CRITICAL SECURITY VIOLATION: Access denied. Only the Master System Administrator can modify Core parameters, sir.");
+                alert("CRITICAL SECURITY VIOLATION: Only the system creator (jogendra.dipeng11@gmail.com) can modify this core key, sir.");
                 return;
             }
 
@@ -85,7 +86,6 @@
 
             const credential = EmailAuthProvider.credential(currentUser.email, verificationPassword);
             try {
-                // Check 2: Forces direct cryptographic re-authentication challenge to ensure it's actually you
                 await reauthenticateWithCredential(auth.currentUser, credential);
                 document.getElementById('dashboard-gemini-key').disabled = false;
                 document.getElementById('dashboard-gemini-key').value = GLOBAL_SYSTEM_AI_KEY; 
@@ -99,7 +99,6 @@
 
         window.saveSystemKey = async () => {
             if (!currentUser) return;
-            // Reinforce admin check before writing payload to database
             if (currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
                 alert("ACCESS DENIED: Administrative write privileges required.");
                 return;
@@ -109,8 +108,9 @@
             if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key signature layout sequence, sir.");
             
             try {
-                await set(ref(db, `users/${currentUser.uid}/ai_security_core`), { key: keyVal });
-                alert("System Core AI Key Signature Synchronized to the Cloud, Sir!");
+                // Saves directly to a central path that allows public reading but admin-only writing
+                await set(ref(db, `global_config/${ADMIN_UID_PATH}`), { key: keyVal });
+                alert("System Core AI Key Signature Synchronized Globally, Sir!");
             } catch (err) {
                 alert("Database sync fault: " + err.message);
             }
@@ -250,7 +250,7 @@
             if(!text) return;
             
             if (!GLOBAL_SYSTEM_AI_KEY) {
-                await jarvisSpeak("Sir, please assign your system core API key using the secure lockbox above first.");
+                await jarvisSpeak("Sir, the system core API key has not been deployed globally yet.");
                 return;
             }
 
@@ -460,11 +460,10 @@
         </div>
         <div class="controls">
             
-            <!-- 🔒 ADMIN LOCKED SYSTEM CORE VAULT -->
             <div class="security-lockbox">
-                🔒 Core AI: <input type="password" id="dashboard-gemini-key" placeholder="System API Core Offline...">
+                🔒 Global AI Core: <input type="password" id="dashboard-gemini-key" placeholder="Awaiting Central Deployment...">
                 <button type="button" id="unlock-key-btn" class="btn-unlock" onclick="window.unlockKeyField()">Modify Core</button>
-                <button type="button" id="sync-key-btn" onclick="window.saveSystemKey()">Sync to Cloud</button>
+                <button type="button" id="sync-key-btn" onclick="window.saveSystemKey()">Sync Globally</button>
             </div>
 
             <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
