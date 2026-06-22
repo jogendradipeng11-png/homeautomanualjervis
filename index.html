@@ -36,7 +36,7 @@
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
                 
-                // Initialize Secure Key Input UI State
+                // Load key from secure local storage memory automatically
                 const savedKey = localStorage.getItem('secure_gemini_key');
                 if (savedKey) {
                     document.getElementById('dashboard-gemini-key').value = savedKey;
@@ -197,7 +197,7 @@
             const text = input.value.trim();
             if(!text) return;
             
-            // Extract the Key directly from Secure Browser Storage
+            // Extract the Key directly from Local Storage
             const SYSTEM_AI_KEY = localStorage.getItem('secure_gemini_key');
             if (!SYSTEM_AI_KEY) {
                 await jarvisSpeak("Sir, please assign your system core API key using the security input field above first.");
@@ -262,7 +262,8 @@
             }
 
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${SYSTEM_AI_KEY.trim()}`, {
+                // Fixed stable model generation endpoint routing parameter layout
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${SYSTEM_AI_KEY.trim()}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -335,7 +336,6 @@
         .logout-btn { background:#e74c3c; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; font-weight: bold; }
         .controls { padding:30px; }
         
-        /* Secure Key Locker UI Layout Styling */
         .security-lockbox { background:#fff3cd; border: 1px solid #ffeeba; border-radius:12px; padding:15px; margin-bottom:20px; display:flex; gap:10px; align-items:center; }
         .security-lockbox input { flex:1; padding:10px; border:1px solid #ced4da; border-radius:8px; font-size:14px; }
         .security-lockbox button { padding:10px 20px; background:#ffc107; color:#212529; border:none; border-radius:8px; font-weight:bold; cursor:pointer; }
