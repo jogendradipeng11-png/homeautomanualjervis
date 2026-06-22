@@ -26,10 +26,10 @@
         let currentUser = null;
         let userDevicesList = []; 
         let GLOBAL_SYSTEM_AI_KEY = ""; 
-        let recognition = null;
-        let isAlwaysListening = false;
 
+        // 🔒 MASTER GLOBAL ADMIN EMAIL
         const ADMIN_EMAIL = "jogendra.dipeng11@gmail.com"; 
+        // Admin UID placeholder used to build a fixed global path for all users to read from
         const ADMIN_UID_PATH = "master_admin_global_core";
 
         window.activeRoom = null;
@@ -42,6 +42,7 @@
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
                 
+                // 🌐 GLOBAL PUBLIC SYNC: All users pull the key from your central admin path
                 const keyRef = ref(db, `global_config/${ADMIN_UID_PATH}/key`);
                 onValue(keyRef, (snapshot) => {
                     const cloudKey = snapshot.val();
@@ -67,21 +68,22 @@
                 currentUser = null;
                 userDevicesList = [];
                 GLOBAL_SYSTEM_AI_KEY = "";
-                isAlwaysListening = false;
-                if(recognition) { recognition.abort(); }
                 document.getElementById('auth-container').style.display = 'block';
                 document.getElementById('app-container').style.display = 'none';
                 document.getElementById('jarvis-wizard-container').style.display = 'none';
             }
         });
 
+        // 🔓 ADMIN-ONLY PASSWORD CHANNELS
         window.unlockKeyField = async () => {
             if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
                 alert("CRITICAL SECURITY VIOLATION: Only the system creator (jogendra.dipeng11@gmail.com) can modify this core key, sir.");
                 return;
             }
+
             const verificationPassword = prompt("MASTER SECURITY CHALLENGE: Please input your administrator account password to release the AI lockbox:");
             if (!verificationPassword) return;
+
             const credential = EmailAuthProvider.credential(currentUser.email, verificationPassword);
             try {
                 await reauthenticateWithCredential(auth.currentUser, credential);
@@ -91,18 +93,27 @@
                 document.getElementById('sync-key-btn').style.display = 'inline-block';
                 document.getElementById('unlock-key-btn').style.display = 'none';
             } catch (err) {
-                alert("ACCESS DENIED: Authentication footprint mismatch.");
+                alert("ACCESS DENIED: Authentication footprint mismatch. Security perimeter maintained.");
             }
         };
 
         window.saveSystemKey = async () => {
-            if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
+            if (!currentUser) return;
+            if (currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+                alert("ACCESS DENIED: Administrative write privileges required.");
+                return;
+            }
+            
             const keyVal = document.getElementById('dashboard-gemini-key').value.trim();
-            if(!keyVal || keyVal.includes("•••")) return alert("Please input a valid key sequence, sir.");
+            if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key signature layout sequence, sir.");
+            
             try {
+                // Saves directly to a central path that allows public reading but admin-only writing
                 await set(ref(db, `global_config/${ADMIN_UID_PATH}`), { key: keyVal });
                 alert("System Core AI Key Signature Synchronized Globally, Sir!");
-            } catch (err) { alert("Database sync fault: " + err.message); }
+            } catch (err) {
+                alert("Database sync fault: " + err.message);
+            }
         };
 
         window.login = async () => {
@@ -124,7 +135,7 @@
             } catch (e) { showMessage('signup-error', e.message); }
         };
 
-        window.logout = () => { isAlwaysListening = false; if(recognition){recognition.stop();} signOut(auth); };
+        window.logout = () => signOut(auth);
         window.showLogin = () => { document.getElementById('login-form').style.display = 'block'; document.getElementById('signup-form').style.display = 'none'; };
         window.showSignup = () => { document.getElementById('login-form').style.display = 'none'; document.getElementById('signup-form').style.display = 'block'; };
 
@@ -203,8 +214,12 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById('add-device-btn').onclick = () => { document.getElementById('modal').style.display = 'flex'; };
-            document.getElementById('close-modal').onclick = () => { document.getElementById('modal').style.display = 'none'; };
+            document.getElementById('add-device-btn').onclick = () => {
+                document.getElementById('modal').style.display = 'flex';
+            };
+            document.getElementById('close-modal').onclick = () => {
+                document.getElementById('modal').style.display = 'none';
+            };
         });
 
         window.addDevice = () => {
@@ -220,171 +235,133 @@
         function jarvisSpeak(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) { resolve(); return; }
-                if (recognition && isAlwaysListening) { recognition.onend = null; recognition.stop(); }
-                
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US'; utterance.rate = 1.0; utterance.pitch = 0.95;
-                
-                utterance.onend = () => { 
-                    if (isAlwaysListening) { setTimeout(executeMicResume, 100); }
-                    resolve(); 
-                };
-                utterance.onerror = () => { 
-                    if (isAlwaysListening) { setTimeout(executeMicResume, 100); }
-                    resolve(); 
-                };
+                utterance.onend = () => resolve(); utterance.onerror = () => resolve();
                 window.speechSynthesis.speak(utterance);
             });
         }
 
-        function executeMicResume() {
-            if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
-        }
-
-        // ====================== 🔄 CLICK-TO-TOGGLE ACTIVE LISTENING ======================
-        window.toggleVoiceListening = () => {
-            const micBtn = document.getElementById("jarvis-mic-btn");
-            const currentInput = document.getElementById('jarvis-input');
-
-            if (isAlwaysListening) {
-                isAlwaysListening = false;
-                if (recognition) { recognition.onend = null; recognition.stop(); }
-                micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; 
-                currentInput.placeholder = "Ask Jarvis Anything...";
-            } else {
-                isAlwaysListening = true;
-                if (!recognition) {
-                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    if (!SpeechRecognition) {
-                        alert("Speech engine unsupported on this browser profile.");
-                        isAlwaysListening = false;
-                        return;
-                    }
-                    recognition = new SpeechRecognition();
-                    recognition.continuous = false;
-                    recognition.interimResults = false;
-                    recognition.lang = 'en-US';
-                }
-
-                micBtn.style.background = "#2ecc71"; 
-                currentInput.placeholder = "Listening live for 'Hey Jarvis'...";
-
-                recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                recognition.onerror = (e) => { if (isAlwaysListening) { setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); } };
-                
-                recognition.onresult = (event) => {
-                    const spokenText = event.results[0][0].transcript.trim();
-                    const norm = spokenText.toLowerCase();
-
-                    if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree")) {
-                        currentInput.value = spokenText;
-                    }
-                    processVoiceMatrix(spokenText);
-                };
-
-                try { recognition.start(); } catch(e) {}
-            }
-        };
-
-        // ====================== 🧠 PASSIVE WAKE-WORD & DUAL-BRAIN MATRIX ======================
-        async function processVoiceMatrix(rawText) {
-            const norm = rawText.toLowerCase();
+        // ====================== DIRECT CORE CONTROLLER ======================
+        window.sendJarvisCommand = async () => {
+            const input = document.getElementById('jarvis-input'); 
+            const text = input.value.trim();
+            if(!text) return;
             
-            if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree")) {
-                let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").trim();
-                
-                if (!cleanCommand) {
-                    await jarvisSpeak("How can I help you, sir?");
-                    return;
-                }
+            if (!GLOBAL_SYSTEM_AI_KEY) {
+                await jarvisSpeak("Sir, the system core API key has not been deployed globally yet.");
+                return;
+            }
 
-                const isOff = cleanCommand.includes("off") || cleanCommand.includes("stop") || cleanCommand.includes("turn off");
-                const isOn = cleanCommand.includes("on") || cleanCommand.includes("start") || cleanCommand.includes("turn on");
-                
-                if ((cleanCommand.includes("bulb") || cleanCommand.includes("light") || cleanCommand.includes("fan")) && (isOn || isOff)) {
-                    let target = userDevicesList[0] || { roomId: "chintubedroom", deviceId: "chintubedroom" };
-                    for (let d of userDevicesList) {
-                        if (cleanCommand.includes(d.roomId.toLowerCase()) || cleanCommand.includes(d.deviceId.toLowerCase())) {
-                            target = d;
-                            break;
-                        }
-                    }
-
-                    let updates = {};
-                    let phraseDetail = "";
-
-                    if (cleanCommand.includes("all") || (cleanCommand.includes("bulb") && !/\d/.test(cleanCommand))) {
-                        updates["bulb1"] = isOn; updates["bulb2"] = isOn; updates["bulb3"] = isOn; updates["bulb4"] = isOn;
-                        phraseDetail = "all appliances";
-                    } else {
-                        if (cleanCommand.includes("bulb 1") || cleanCommand.includes("bulb1")) { updates["bulb1"] = isOn; phraseDetail = "bulb 1"; }
-                        if (cleanCommand.includes("bulb 2") || cleanCommand.includes("bulb2")) { updates["bulb2"] = isOn; phraseDetail = "bulb 2"; }
-                        if (cleanCommand.includes("bulb 3") || cleanCommand.includes("bulb3")) { updates["bulb3"] = isOn; phraseDetail = "bulb 3"; }
-                        if (cleanCommand.includes("bulb 4") || cleanCommand.includes("bulb4")) { updates["bulb4"] = isOn; phraseDetail = "bulb 4"; }
-                    }
-
-                    if (cleanCommand.includes("fan")) {
-                        let fanSpeed = 0; let speedText = "off";
-                        if (isOff) fanSpeed = 0;
-                        else if (cleanCommand.includes("low") || cleanCommand.includes("speed 1")) { fanSpeed = 1; speedText = "low"; }
-                        else if (cleanCommand.includes("medium") || cleanCommand.includes("med") || cleanCommand.includes("speed 2")) { fanSpeed = 2; speedText = "medium"; }
-                        else if (cleanCommand.includes("high") || cleanCommand.includes("speed 3")) { fanSpeed = 3; speedText = "high"; }
-                        else if (isOn) { fanSpeed = 1; speedText = "low"; }
-                        
-                        updates["fanSpeed"] = fanSpeed;
-                        phraseDetail = phraseDetail ? "appliances and fan" : `fan speed to ${speedText}`;
-                    }
-
-                    if (Object.keys(updates).length > 0) {
-                        try {
-                            await update(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states`), updates);
-                            await jarvisSpeak(`Certainly sir. Adjusting your ${phraseDetail} parameters inside ${target.roomId} now.`);
-                            document.getElementById('jarvis-input').value = ""; 
-                        } catch(err) {
-                            await jarvisSpeak("Database sync block error, sir.");
-                        }
-                        return;
+            input.disabled = true; 
+            input.placeholder = "Processing command, sir...";
+            
+            const norm = text.toLowerCase();
+            const isOff = norm.includes("off") || norm.includes("stop") || norm.includes("turn off");
+            const isOn = norm.includes("on") || norm.includes("start") || norm.includes("turn on");
+            
+            if ((norm.includes("bulb") || norm.includes("light") || norm.includes("fan")) && (isOn || isOff)) {
+                let target = userDevicesList[0] || { roomId: "chintubedroom", deviceId: "chintubedroom" };
+                for (let d of userDevicesList) {
+                    if (norm.includes(d.roomId.toLowerCase()) || norm.includes(d.deviceId.toLowerCase())) {
+                        target = d;
+                        break;
                     }
                 }
 
-                if (!GLOBAL_SYSTEM_AI_KEY) {
-                    await jarvisSpeak("Sir, cloud brain offline. Please hook administrative key elements first.");
-                    return;
+                let updates = {};
+                let phraseDetail = "";
+
+                if (norm.includes("all") || (norm.includes("bulb") && !/\d/.test(norm))) {
+                    updates["bulb1"] = isOn; updates["bulb2"] = isOn; updates["bulb3"] = isOn; updates["bulb4"] = isOn;
+                    phraseDetail = "all appliances";
+                } else {
+                    if (norm.includes("bulb 1") || norm.includes("bulb1")) { updates["bulb1"] = isOn; phraseDetail = "bulb 1"; }
+                    if (norm.includes("bulb 2") || norm.includes("bulb2")) { updates["bulb2"] = isOn; phraseDetail = "bulb 2"; }
+                    if (norm.includes("bulb 3") || norm.includes("bulb3")) { updates["bulb3"] = isOn; phraseDetail = "bulb 3"; }
+                    if (norm.includes("bulb 4") || norm.includes("bulb4")) { updates["bulb4"] = isOn; phraseDetail = "bulb 4"; }
                 }
 
-                document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; 
-                document.getElementById('jarvis-input').placeholder = "Processing command, sir...";
-
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GLOBAL_SYSTEM_AI_KEY.trim()}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: `You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily. User Request: "${cleanCommand}"` }] }]
-                        })
-                    });
+                if (norm.includes("fan")) {
+                    let fanSpeed = 0; let speedText = "off";
+                    if (isOff) fanSpeed = 0;
+                    else if (norm.includes("low") || norm.includes("speed 1")) { fanSpeed = 1; speedText = "low"; }
+                    else if (norm.includes("medium") || norm.includes("med") || norm.includes("speed 2")) { fanSpeed = 2; speedText = "medium"; }
+                    else if (norm.includes("high") || norm.includes("speed 3")) { fanSpeed = 3; speedText = "high"; }
+                    else if (isOn) { fanSpeed = 1; speedText = "low"; }
                     
-                    const data = await response.json();
-                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                        const aiReply = data.candidates[0].content.parts[0].text.trim();
-                        await jarvisSpeak(aiReply);
-                        document.getElementById('jarvis-input').value = ""; 
-                    } else {
-                        await jarvisSpeak("Core query matrix loop returned empty, sir.");
+                    updates["fanSpeed"] = fanSpeed;
+                    phraseDetail = phraseDetail ? "appliances and fan" : `fan speed to ${speedText}`;
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    try {
+                        await update(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states`), updates);
+                        await jarvisSpeak(`Certainly sir. Adjusting your ${phraseDetail} parameters inside ${target.roomId} now.`);
+                        input.value = '';
+                    } catch(err) {
+                        await jarvisSpeak("Database synchronization failure, sir.");
+                    } finally {
+                        input.disabled = false; input.placeholder = "Ask Jarvis Anything...";
                     }
-                } catch (err) {
-                    await jarvisSpeak("Cloud routing channel offline, sir.");
+                    return;
                 }
             }
-        }
 
-        window.sendJarvisCommand = () => {
-            const rawText = document.getElementById('jarvis-input').value.trim();
-            if(rawText) { 
-                processVoiceMatrix("Hey Jarvis " + rawText); 
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GLOBAL_SYSTEM_AI_KEY.trim()}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `You are Jarvis, a highly intelligent smart home assistant. Always address the user respectfully as 'sir'. Keep answers helpful, concise, and natural so they speak out loud easily. User Request: "${text}"` }] }]
+                    })
+                });
+                
+                const data = await response.json();
+
+                if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const aiReply = data.candidates[0].content.parts[0].text.trim();
+                    await jarvisSpeak(aiReply);
+                    input.value = '';
+                } else if (data.error) {
+                    console.error("Google AI Studio Link Issue:", data.error);
+                    await jarvisSpeak(`Sir, the AI channel returned an error. ${data.error.message || "Please verify key parameters."}`);
+                } else {
+                    await jarvisSpeak("Core parameter stream loop empty, sir.");
+                }
+            } catch (err) {
+                console.error(err);
+                await jarvisSpeak("Connection channels dropped offline, sir.");
+            } finally { 
+                input.disabled = false; input.placeholder = "Ask Jarvis Anything..."; input.focus(); 
             }
         };
+
+        window.startVoiceInput = () => {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SpeechRecognition) return alert("Speech recognition unavailable.");
+            const recog = new SpeechRecognition(); recog.lang = 'en-US';
+            recog.onstart = () => { document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; document.getElementById('jarvis-input').placeholder = "Listening..."; };
+            recog.onend = () => { document.getElementById("jarvis-mic-btn").style.background = "linear-gradient(135deg,#667eea,#764ba2)"; document.getElementById('jarvis-input').placeholder = "Ask Jarvis Anything..."; };
+            recog.onresult = e => { document.getElementById('jarvis-input').value = e.results[0][0].transcript; window.sendJarvisCommand(); };
+            recog.start();
+        };
+
+        window.toggleJarvisWizard = (expand) => {
+            document.getElementById('jarvis-orb').style.display = expand ? 'none' : 'flex';
+            document.getElementById('jarvis-panel').style.display = expand ? 'block' : 'none';
+        };
+        window.turnOffJarvisWizard = () => { if(confirm("Hide Jarvis wizard?")) { document.getElementById('jarvis-wizard-container').style.display = 'none'; localStorage.setItem('jarvis-enabled', 'false'); } };
+        window.activateJarvisWizard = () => { document.getElementById('jarvis-wizard-container').style.display = 'block'; localStorage.setItem('jarvis-enabled', 'true'); window.toggleJarvisWizard(true); };
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            const container = document.getElementById("jarvis-wizard-container");
+            const header = document.getElementById("jarvis-drag-header"); const orb = document.getElementById("jarvis-orb");
+            let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+            header.onmousedown = dragMouseDown; orb.onmousedown = dragMouseDown;
+            function dragMouseDown(e) { if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT')return; e.preventDefault(); p3=e.clientX; p4=e.clientY; document.onmouseup=()=> { document.onmouseup=null; document.onmousemove=null; }; document.onmousemove=(ev)=>{ ev.preventDefault(); p1=p3-ev.clientX; p2=p4-ev.clientY; p3=ev.clientX; p4=ev.clientY; container.style.top=(container.offsetTop-p2)+"px"; container.style.left=(container.offsetLeft-p1)+"px"; container.style.bottom="auto"; container.style.right="auto"; }; }
+        });
     </script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -447,11 +424,9 @@
         .jarvis-panel-actions .power-off:hover { color: #e74c3c; }
         .jarvis-panel-body { padding: 15px; }
         .jarvis-input-group { display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e; }
-        
-        .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; pointer-events: auto; }
+        .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; }
         .jarvis-input-group input:focus { outline: none; }
-        
-        .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: background 0.2s; }
+        .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
         .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
         @keyframes floatingPulse { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
@@ -542,7 +517,7 @@
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
                 <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
-                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.toggleVoiceListening()">🎤</button>
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="startVoiceInput()">🎤</button>
                 <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
         </div>
