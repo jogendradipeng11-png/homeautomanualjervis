@@ -42,7 +42,10 @@
                 document.getElementById('auth-container').style.display = 'none';
                 document.getElementById('app-container').style.display = 'block';
                 
-                // 🌐 GLOBAL PUBLIC SYNC: All users pull the key from your central admin path
+                // 🌐 Forced Open Fix: Ensures the Jarvis float window container is fully displayed upon login
+                document.getElementById('jarvis-wizard-container').style.display = 'block';
+                
+                // GLOBAL PUBLIC SYNC: All users pull the key from your central admin path
                 const keyRef = ref(db, `global_config/${ADMIN_UID_PATH}/key`);
                 onValue(keyRef, (snapshot) => {
                     const cloudKey = snapshot.val();
@@ -60,9 +63,6 @@
                     }
                 });
 
-                if (localStorage.getItem('jarvis-enabled') !== 'false') {
-                    document.getElementById('jarvis-wizard-container').style.display = 'block';
-                }
                 loadUserDevices();
             } else {
                 currentUser = null;
@@ -110,7 +110,6 @@
             if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key signature layout sequence, sir.");
             
             try {
-                // Saves directly to a central path that allows public reading but admin-only writing
                 await set(ref(db, `global_config/${ADMIN_UID_PATH}`), { key: keyVal });
                 alert("System Core AI Key Signature Synchronized Globally, Sir!");
             } catch (err) {
@@ -257,7 +256,7 @@
             if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
         }
 
-        // ====================== 🔄 NEW DEDICATED ALWAYS ONLINE TOGGLE FUNCTION ======================
+        // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
         window.toggleAlwaysOnlineListening = () => {
             const onlineBtn = document.getElementById("jarvis-always-online-btn");
             const currentInput = document.getElementById('jarvis-input');
@@ -284,7 +283,7 @@
                 }
 
                 onlineBtn.textContent = "Always Online: ACTIVE";
-                onlineBtn.style.background = "#2ecc71"; // Distinct glowing active green color
+                onlineBtn.style.background = "#2ecc71"; 
                 currentInput.placeholder = "Listening for wake words...";
 
                 recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
@@ -299,9 +298,9 @@
             }
         };
 
-        // Standard direct single-shot microphone mode trigger behavior
+        // Standard single-shot microphone utility action click
         window.startVoiceInput = () => {
-            if (isAlwaysListening) return; // If infinite mode is running, prevent duplicate threads
+            if (isAlwaysListening) return; 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if(!SpeechRecognition) return alert("Speech recognition unavailable.");
             const recog = new SpeechRecognition(); recog.lang = 'en-US';
@@ -368,7 +367,7 @@
                             await jarvisSpeak(`Certainly sir. Adjusting your ${phraseDetail} parameters inside ${target.roomId} now.`);
                             document.getElementById('jarvis-input').value = "";
                         } catch(err) {
-                            await jarvisSpeak("Database field writing synchronization failure, sir.");
+                            await jarvisSpeak("Database synchronization failure, sir.");
                         }
                         return;
                     }
@@ -453,7 +452,7 @@
         .online-indicator.online { background:#2ecc71; box-shadow:0 0 10px #2ecc71; }
         .btn-control { background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:12px 30px; border:none; border-radius:12px; cursor:pointer; width:100%; margin:10px 0; font-weight: bold; }
         .btn-remove { background:none; color:#e74c3c; padding:8px 16px; border:1px solid #e74c3c; border-radius:8px; cursor:pointer; font-size:13px; }
-        #back-btn { background:#6c757d; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; margin-bottom:20px; display:none; font-weight: bold; }
+        #back-btn { background:#6c757d; color:white; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; margin-bottom:20px; display:none; font-weight: bold; }
         #control-panel { display:none; background:#f8f9fa; padding:30px; border-radius:15px; border: 1px solid #e9ecef; }
         #control-title { text-align:center; color:#2c3e50; font-size:1.9em; margin-bottom:20px; }
         .bulbs-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:20px; margin:30px 0; }
@@ -470,7 +469,9 @@
         
         .jarvis-wizard-wrapper { position: fixed; bottom: 30px; right: 30px; z-index: 5000; }
         .jarvis-orb { width: 65px; height: 65px; border-radius: 50%; background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4), inset 0 0 15px rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: move; transition: transform 0.2s ease; animation: floatingPulse 2s infinite ease-in-out; }
-        .jarvis-panel { display: none; width: 340px; background: rgba(23, 32, 42, 0.96); border: 2px solid #00d2ff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
+        
+        /* 🌐 Forced Visible Panel Default Styling Override Layout */
+        .jarvis-panel { display: block; width: 340px; background: rgba(23, 32, 42, 0.96); border: 2px solid #00d2ff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
         .jarvis-panel-header { background: linear-gradient(135deg, #1c2833, #2c3e50); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: move; }
         .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
         .jarvis-panel-actions { display: flex; gap: 8px; }
@@ -486,7 +487,6 @@
         .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
         
-        /* 🌟 NEW STYLING LAYOUT PROPERTY FOR ADJACENT ALWAYS-ONLINE ACTION TOGGLE */
         .jarvis-always-online-action { display: block; width: 100%; margin-top: 12px; padding: 10px; border: none; border-radius: 12px; background: linear-gradient(135deg, #0072ff, #00c6ff); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-align: center; box-shadow: 0 4px 15px rgba(0,114,255,0.2); transition: transform 0.1s; }
         .jarvis-always-online-action:active { transform: scale(0.98); }
         
