@@ -257,22 +257,23 @@
             if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
         }
 
-        // ====================== 🔄 ALWAYS ONLINE CLICK-TO-TOGGLE LOOP ======================
-        window.startVoiceInput = () => {
-            const micBtn = document.getElementById("jarvis-mic-btn");
+        // ====================== 🔄 NEW DEDICATED ALWAYS ONLINE TOGGLE FUNCTION ======================
+        window.toggleAlwaysOnlineListening = () => {
+            const onlineBtn = document.getElementById("jarvis-always-online-btn");
             const currentInput = document.getElementById('jarvis-input');
 
             if (isAlwaysListening) {
                 isAlwaysListening = false;
                 if (recognition) { recognition.onend = null; recognition.stop(); }
-                micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; 
+                onlineBtn.textContent = "Go Always Online";
+                onlineBtn.style.background = "linear-gradient(135deg, #0072ff, #00c6ff)";
                 currentInput.placeholder = "Ask Jarvis Anything...";
             } else {
                 isAlwaysListening = true;
                 if (!recognition) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     if (!SpeechRecognition) {
-                        alert("Speech recognition unavailable.");
+                        alert("Speech recognition engine unsupported on this client browser profile.");
                         isAlwaysListening = false;
                         return;
                     }
@@ -282,8 +283,9 @@
                     recognition.lang = 'en-US';
                 }
 
-                micBtn.style.background = "#2ecc71"; // Active green state
-                currentInput.placeholder = "Listening live for wake words...";
+                onlineBtn.textContent = "Always Online: ACTIVE";
+                onlineBtn.style.background = "#2ecc71"; // Distinct glowing active green color
+                currentInput.placeholder = "Listening for wake words...";
 
                 recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
                 recognition.onerror = (e) => { if (isAlwaysListening) { setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); } };
@@ -295,6 +297,18 @@
 
                 try { recognition.start(); } catch(e) {}
             }
+        };
+
+        // Standard direct single-shot microphone mode trigger behavior
+        window.startVoiceInput = () => {
+            if (isAlwaysListening) return; // If infinite mode is running, prevent duplicate threads
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SpeechRecognition) return alert("Speech recognition unavailable.");
+            const recog = new SpeechRecognition(); recog.lang = 'en-US';
+            recog.onstart = () => { document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; document.getElementById('jarvis-input').placeholder = "Listening..."; };
+            recog.onend = () => { document.getElementById("jarvis-mic-btn").style.background = "linear-gradient(135deg,#667eea,#764ba2)"; document.getElementById('jarvis-input').placeholder = "Ask Jarvis Anything..."; };
+            recog.onresult = e => { document.getElementById('jarvis-input').value = e.results[0][0].transcript; window.sendJarvisCommand(); };
+            recog.start();
         };
 
         // ====================== 🧠 PASSIVE WAKE-WORD & DUAL-BRAIN MATRIX ======================
@@ -354,7 +368,7 @@
                             await jarvisSpeak(`Certainly sir. Adjusting your ${phraseDetail} parameters inside ${target.roomId} now.`);
                             document.getElementById('jarvis-input').value = "";
                         } catch(err) {
-                            await jarvisSpeak("Database synchronization failure, sir.");
+                            await jarvisSpeak("Database field writing synchronization failure, sir.");
                         }
                         return;
                     }
@@ -465,13 +479,17 @@
         .jarvis-panel-body { padding: 15px; }
         .jarvis-input-group { display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e; }
         
-        /* Input remains 100% active for manual typing at any time */
         .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; pointer-events: auto; }
         .jarvis-input-group input:focus { outline: none; }
         
         .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
         .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
+        
+        /* 🌟 NEW STYLING LAYOUT PROPERTY FOR ADJACENT ALWAYS-ONLINE ACTION TOGGLE */
+        .jarvis-always-online-action { display: block; width: 100%; margin-top: 12px; padding: 10px; border: none; border-radius: 12px; background: linear-gradient(135deg, #0072ff, #00c6ff); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-align: center; box-shadow: 0 4px 15px rgba(0,114,255,0.2); transition: transform 0.1s; }
+        .jarvis-always-online-action:active { transform: scale(0.98); }
+        
         @keyframes floatingPulse { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
     </style>
 </head>
@@ -563,6 +581,7 @@
                 <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.startVoiceInput()">🎤</button>
                 <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
+            <button type="button" class="jarvis-always-online-action" id="jarvis-always-online-btn" onclick="window.toggleAlwaysOnlineListening()">Go Always Online</button>
         </div>
     </div>
 </div>
