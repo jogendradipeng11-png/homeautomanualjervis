@@ -63,7 +63,6 @@
                     document.getElementById('jarvis-wizard-container').style.display = 'block';
                 }
                 loadUserDevices();
-                initContinuousListening();
             } else {
                 currentUser = null;
                 userDevicesList = [];
@@ -228,58 +227,67 @@
                 utterance.lang = 'en-US'; utterance.rate = 1.0; utterance.pitch = 0.95;
                 
                 utterance.onend = () => { 
-                    if (isAlwaysListening) { setTimeout(startListeningLoop, 100); }
+                    if (isAlwaysListening) { setTimeout(executeMicResume, 100); }
                     resolve(); 
                 };
                 utterance.onerror = () => { 
-                    if (isAlwaysListening) { setTimeout(startListeningLoop, 100); }
+                    if (isAlwaysListening) { setTimeout(executeMicResume, 100); }
                     resolve(); 
                 };
                 window.speechSynthesis.speak(utterance);
             });
         }
 
-        // ====================== 🔄 UNBREAKABLE ALWAYS-LISTENING LOOP ======================
-        function initContinuousListening() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return;
-            
-            recognition = new SpeechRecognition();
-            recognition.continuous = false; 
-            recognition.interimResults = false;
-            recognition.lang = 'en-US';
-
-            isAlwaysListening = true;
-            startListeningLoop();
+        function executeMicResume() {
+            if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
         }
 
-        function startListeningLoop() {
-            if (!isAlwaysListening || !recognition) return;
-            
-            document.getElementById("jarvis-mic-btn").style.background = "#2ecc71"; 
-            
-            // 🌟 KEEP SPACE AVAILABLE: Leave placeholder open for manual text typing anytime
+        // ====================== 🔄 CLICK-TO-TOGGLE ACTIVE LISTENING FIELD ======================
+        window.toggleVoiceListening = () => {
+            const micBtn = document.getElementById("jarvis-mic-btn");
             const currentInput = document.getElementById('jarvis-input');
-            if (currentInput.value === "") {
+
+            if (isAlwaysListening) {
+                // Turn completely offline
+                isAlwaysListening = false;
+                if (recognition) { recognition.onend = null; recognition.stop(); }
+                micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; // Reset to normal purple color
                 currentInput.placeholder = "Ask Jarvis or type here...";
-            }
-
-            recognition.onend = () => { if (isAlwaysListening) { startListeningLoop(); } };
-            recognition.onerror = (e) => { if (isAlwaysListening) { setTimeout(startListeningLoop, 50); } };
-
-            recognition.onresult = (event) => {
-                const spokenText = event.results[0][0].transcript.trim();
-                const norm = spokenText.toLowerCase();
-
-                // 🌟 SMART WRITING SYNC: Only populate the box if a wake word is used
-                if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree")) {
-                    document.getElementById('jarvis-input').value = spokenText;
+            } else {
+                // Turn completely online
+                isAlwaysListening = true;
+                if (!recognition) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognition) {
+                        alert("Speech engine unsupported on this browser profile.");
+                        isAlwaysListening = false;
+                        return;
+                    }
+                    recognition = new SpeechRecognition();
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.lang = 'en-US';
                 }
-                processVoiceMatrix(spokenText);
-            };
 
-            try { recognition.start(); } catch(e) {}
-        }
+                micBtn.style.background = "#2ecc71"; // Turns active green color
+                currentInput.placeholder = "Listening live for 'Hey Jarvis'...";
+
+                recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
+                recognition.onerror = (e) => { if (isAlwaysListening) { setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); } };
+                
+                recognition.onresult = (event) => {
+                    const spokenText = event.results[0][0].transcript.trim();
+                    const norm = spokenText.toLowerCase();
+
+                    if (norm.startsWith("hey jarvis") || norm.startsWith("hey shree") || norm.startsWith("jarvis") || norm.startsWith("shree")) {
+                        currentInput.value = spokenText;
+                    }
+                    processVoiceMatrix(spokenText);
+                };
+
+                try { recognition.start(); } catch(e) {}
+            }
+        };
 
         // ====================== 🧠 PASSIVE WAKE-WORD & DUAL-BRAIN MATRIX ======================
         async function processVoiceMatrix(rawText) {
@@ -334,7 +342,7 @@
                         try {
                             await update(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states`), updates);
                             await jarvisSpeak(`Certainly sir. Adjusting your ${phraseDetail} parameters inside ${target.roomId} now.`);
-                            document.getElementById('jarvis-input').value = ""; // Clear text area after completion
+                            document.getElementById('jarvis-input').value = ""; 
                         } catch(err) {
                             await jarvisSpeak("Database sync block error, sir.");
                         }
@@ -363,7 +371,7 @@
                     if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
                         const aiReply = data.candidates[0].content.parts[0].text.trim();
                         await jarvisSpeak(aiReply);
-                        document.getElementById('jarvis-input').value = ""; // Clear text area after completion
+                        document.getElementById('jarvis-input').value = ""; 
                     } else {
                         await jarvisSpeak("Core query matrix loop returned empty, sir.");
                     }
@@ -373,11 +381,9 @@
             }
         }
 
-        // 🌟 UNLOCKED SEND INTERACTION: Process custom manual text entries directly
         window.sendJarvisCommand = () => {
             const rawText = document.getElementById('jarvis-input').value.trim();
             if(rawText) { 
-                // Treat written text exactly like a voice command with the wake word included
                 processVoiceMatrix("Hey Jarvis " + rawText); 
             }
         };
@@ -444,12 +450,11 @@
         .jarvis-panel-body { padding: 15px; }
         .jarvis-input-group { display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e; }
         
-        /* 🌟 WRITING ALLOWANCE UNLOCKED: Input box is completely active for manual writing */
         .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; pointer-events: auto; }
         .jarvis-input-group input:focus { outline: none; }
         
-        .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
-        .mic-btn { background: #2ecc71; }
+        .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: background 0.2s; }
+        .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
         .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
         @keyframes floatingPulse { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
     </style>
@@ -496,13 +501,13 @@
             <div id="control-panel">
                 <h2 id="control-title">Select a device</h2>
                 <div class="bulbs-grid">
-                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div> h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
                     <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
                 </div>
                 <div class="fan-control">
-                    <h3>Fan Speed Regulator</h3>
+                    h3>Fan Speed Regulator</h3>
                     <div class="speed-buttons">
                         <button type="button" onclick="setFanSpeed(0)">OFF</button>
                         <button type="button" onclick="setFanSpeed(1)">LOW</button>
@@ -539,7 +544,7 @@
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
                 <input type="text" id="jarvis-input" placeholder="Ask Jarvis or type here...">
-                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn">🎤</button>
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.toggleVoiceListening()">🎤</button>
                 <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
         </div>
