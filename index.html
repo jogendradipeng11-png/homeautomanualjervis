@@ -242,19 +242,17 @@
             if (isAlwaysListening && recognition) { try { recognition.start(); } catch(e){} }
         }
 
-        // ====================== 🔄 CLICK-TO-TOGGLE ACTIVE LISTENING FIELD ======================
+        // ====================== 🔄 CLICK-TO-TOGGLE ACTIVE LISTENING ======================
         window.toggleVoiceListening = () => {
             const micBtn = document.getElementById("jarvis-mic-btn");
             const currentInput = document.getElementById('jarvis-input');
 
             if (isAlwaysListening) {
-                // Turn completely offline
                 isAlwaysListening = false;
                 if (recognition) { recognition.onend = null; recognition.stop(); }
-                micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; // Reset to normal purple color
-                currentInput.placeholder = "Ask Jarvis or type here...";
+                micBtn.style.background = "linear-gradient(135deg,#667eea,#764ba2)"; 
+                currentInput.placeholder = "Ask Jarvis Anything...";
             } else {
-                // Turn completely online
                 isAlwaysListening = true;
                 if (!recognition) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -269,7 +267,7 @@
                     recognition.lang = 'en-US';
                 }
 
-                micBtn.style.background = "#2ecc71"; // Turns active green color
+                micBtn.style.background = "#2ecc71"; 
                 currentInput.placeholder = "Listening live for 'Hey Jarvis'...";
 
                 recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
@@ -507,7 +505,7 @@
                     <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
                 </div>
                 <div class="fan-control">
-                    h3>Fan Speed Regulator</h3>
+                    <h3>Fan Speed Regulator</h3>
                     <div class="speed-buttons">
                         <button type="button" onclick="setFanSpeed(0)">OFF</button>
                         <button type="button" onclick="setFanSpeed(1)">LOW</button>
@@ -543,7 +541,7 @@
         </div>
         <div class="jarvis-panel-body">
             <div class="jarvis-input-group">
-                <input type="text" id="jarvis-input" placeholder="Ask Jarvis or type here...">
+                <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
                 <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.toggleVoiceListening()">🎤</button>
                 <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
