@@ -78,11 +78,13 @@
 
         window.unlockKeyField = async () => {
             if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-                alert("CRITICAL SECURITY VIOLATION, Sir.");
+                alert("CRITICAL SECURITY VIOLATION: Only the system creator (jogendra.dipeng11@gmail.com) can modify this core key, sir.");
                 return;
             }
-            const verificationPassword = prompt("MASTER SECURITY CHALLENGE:");
+
+            const verificationPassword = prompt("MASTER SECURITY CHALLENGE: Please input your administrator account password to release the AI lockbox:");
             if (!verificationPassword) return;
+
             const credential = EmailAuthProvider.credential(currentUser.email, verificationPassword);
             try {
                 await reauthenticateWithCredential(auth.currentUser, credential);
@@ -91,23 +93,31 @@
                 document.getElementById('dashboard-gemini-key').focus();
                 document.getElementById('sync-key-btn').style.display = 'inline-block';
                 document.getElementById('unlock-key-btn').style.display = 'none';
-            } catch (err) { alert("ACCESS DENIED."); }
+            } catch (err) {
+                alert("ACCESS DENIED: Authentication footprint mismatch.");
+            }
         };
 
         window.saveSystemKey = async () => {
-            if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
+            if (!currentUser) return;
+            if (currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+                alert("ACCESS DENIED: Administrative write privileges required.");
+                return;
+            }
             const keyVal = document.getElementById('dashboard-gemini-key').value.trim();
-            if(!keyVal || keyVal.includes("•••")) return;
+            if(!keyVal || keyVal.includes("•••")) return alert("Please input a fresh valid key sequence, sir.");
             try {
                 await set(ref(db, `global_config/${ADMIN_UID_PATH}`), { key: keyVal });
-                alert("Core Key Synced!");
-            } catch (e) {}
+                alert("System Core AI Key Signature Synchronized Globally, Sir!");
+            } catch (err) {
+                alert("Database sync fault: " + err.message);
+            }
         };
 
         window.login = async () => {
             const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
-            if (!email || !password) return showMessage('login-error', 'Fill fields.');
+            if (!email || !password) return showMessage('login-error', 'Please fill in all fields.');
             try { await signInWithEmailAndPassword(auth, email, password); } catch (e) { showMessage('login-error', e.message); }
         };
 
@@ -115,8 +125,8 @@
             const email = document.getElementById('signup-email').value.trim();
             const pass = document.getElementById('signup-password').value;
             const confirm = document.getElementById('signup-confirm-password').value;
-            if (!email || !pass || !confirm) return showMessage('signup-error', 'Required fields missing.');
-            if (pass !== confirm) return showMessage('signup-error', 'Passwords mismatch.');
+            if (!email || !pass || !confirm) return showMessage('signup-error', 'All fields are required.');
+            if (pass !== confirm) return showMessage('signup-error', 'Passwords do not match!');
             try {
                 const cred = await createUserWithEmailAndPassword(auth, email, pass);
                 await set(ref(db, 'users/' + cred.user.uid), { email });
@@ -133,7 +143,8 @@
         }
 
         function loadUserDevices() {
-            onValue(ref(db, `users/${currentUser.uid}/devices`), (snapshot) => {
+            const devicesRef = ref(db, `users/${currentUser.uid}/devices`);
+            onValue(devicesRef, (snapshot) => {
                 const data = snapshot.val();
                 userDevicesList = data ? Object.entries(data).map(([id, val]) => ({ id, ...val })) : [];
                 renderDeviceList(userDevicesList);
@@ -143,19 +154,20 @@
         function renderDeviceList(devices) {
             const container = document.getElementById('device-list'); container.innerHTML = '';
             if (devices.length === 0) {
-                container.innerHTML = '<p style="text-align:center;color:#888;">No devices targets added.</p>';
+                container.innerHTML = '<p style="text-align:center;color:#888;font-size:1.2em;grid-column:1/-1;">No devices added yet. Click + to add one!</p>';
                 return;
             }
             devices.forEach(dev => {
                 const card = document.createElement('div'); card.className = 'room-card';
                 card.innerHTML = `
-                    <div class="room-header"><h3>${dev.roomId}</h3><div class="online-indicator" id="status-${dev.roomId}-${dev.deviceId}"></div></div>
-                    <button type="button" class="btn-control" onclick="selectDevice('${dev.roomId}', '${dev.deviceId}')">Controls</button>
+                    <div class="room-header"><h3>${dev.roomId} → ${dev.deviceId}</h3><div class="online-indicator" id="status-${dev.roomId}-${dev.deviceId}"></div></div>
+                    <button type="button" class="btn-control" onclick="selectDevice('${dev.roomId}', '${dev.deviceId}')">Open Controls</button>
+                    <button type="button" class="btn-remove" onclick="removeDevice('${dev.id}')">Remove</button>
                 `;
                 container.appendChild(card);
                 onValue(ref(db, `rooms/${dev.roomId}/devices/${dev.deviceId}/online`), (snap) => {
-                    const ind = document.getElementById(`status-${dev.roomId}-${dev.deviceId}`);
-                    if (ind) ind.className = snap.val() === true ? 'online-indicator online' : 'online-indicator offline';
+                    const indicator = document.getElementById(`status-${dev.roomId}-${dev.deviceId}`);
+                    if (indicator) indicator.className = snap.val() === true ? 'online-indicator online' : 'online-indicator offline';
                 });
             });
         }
@@ -168,7 +180,9 @@
             onValue(ref(db, `rooms/${room}/devices/${device}/states`), (snap) => {
                 const s = snap.val() || {};
                 [1,2,3,4].forEach(i => updateBulb(i, !!s[`bulb${i}`]));
-                onValue(ref(db, `rooms/${room}/devices/${device}/states/fanSpeed`), (fsnap) => { updateFan(fsnap.val() ?? 0); });
+                onValue(ref(db, `rooms/${room}/devices/${device}/states/fanSpeed`), (fsnap) => {
+                     updateFan(fsnap.val() ?? 0);
+                });
             });
         };
 
@@ -178,13 +192,14 @@
         };
 
         window.toggleBulb = (n) => {
-            if (!window.activeRoom) return;
+            if (!window.activeRoom) return alert("Select a device first");
             const el = document.getElementById(`bulb${n}-status`);
-            set(ref(db, `rooms/${window.activeRoom}/devices/${window.activeDevice}/states/bulb${n}`), !(el && el.textContent === "ON"));
+            const current = el && el.textContent === "ON";
+            set(ref(db, `rooms/${window.activeRoom}/devices/${window.activeDevice}/states/bulb${n}`), !current);
         };
 
         window.setFanSpeed = (speed) => {
-            if (!window.activeRoom) return;
+            if (!window.activeRoom) return alert("Select a device first");
             set(ref(db, `rooms/${window.activeRoom}/devices/${window.activeDevice}/states/fanSpeed`), speed);
         };
 
@@ -194,7 +209,8 @@
         }
 
         function updateFan(speed) {
-            if (document.getElementById('fan-status')) document.getElementById('fan-status').textContent = `Current: ${['OFF','LOW','MEDIUM','HIGH'][speed]}`;
+            const statusEl = document.getElementById('fan-status'); if (statusEl) statusEl.textContent = `Current: ${['OFF','LOW','MEDIUM','HIGH'][speed]}`;
+            document.querySelectorAll('.speed-btn').forEach((btn, i) => btn.classList.toggle('active', i === speed));
         }
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -204,16 +220,20 @@
 
         window.addDevice = () => {
             const room = document.getElementById('room-id').value.trim(); const device = document.getElementById('device-id').value.trim();
-            if (!room || !device) return;
+            if (!room || !device) return alert("Please enter both Room ID and Device ID");
             push(ref(db, `users/${currentUser.uid}/devices`), { roomId: room, deviceId: device });
+            document.getElementById('room-id').value = ''; document.getElementById('device-id').value = '';
             document.getElementById('modal').style.display = 'none';
         };
 
-        // ====================== 🔊 AUDIO TTS ENGINE INTERFACE LAYER ======================
+        window.removeDevice = (id) => { if (confirm("Remove this device from your list?")) remove(ref(db, `users/${currentUser.uid}/devices/${id}`)); };
+
+        // ====================== 🔊 AUDIO TTS ENGINE CONTROL LAYER ======================
         function jarvisSpeak(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) { resolve(); return; }
                 
+                // 🔒 Lock Microphone temporarily to avoid echo loops
                 if (recognition) { 
                     recognition.onend = null; 
                     recognition.stop(); 
@@ -221,16 +241,18 @@
                 
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
-                const selectedLang = document.getElementById('jarvis-lang-select').value;
                 
+                // 🌐 Dynamic Audio Output Matching
+                const selectedLang = document.getElementById('jarvis-lang-select').value;
                 utterance.lang = selectedLang; 
-                utterance.rate = 1.25; // High-speed speaking rate configuration
-                utterance.pitch = 1.0;
+                utterance.rate = 1.1; // Slightly faster for an active, human feel
+                utterance.pitch = 0.95;
                 
                 utterance.onend = () => {
+                    // 🔓 Re-open Microphone IMMEDIATELY to listen for your next command
                     if (isAlwaysListening && recognition) { 
                         recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 10); // ⚡ Instantly switches back
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 50); 
                     }
                     resolve();
                 };
@@ -238,7 +260,7 @@
                 utterance.onerror = () => {
                     if (isAlwaysListening && recognition) { 
                         recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 10); 
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 50); 
                     }
                     resolve();
                 };
@@ -265,102 +287,157 @@
                 currentInput.placeholder = "Ask Jarvis Anything...";
             } else {
                 isAlwaysListening = true;
+                
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) return;
+                if (!SpeechRecognition) {
+                    alert("Speech recognition engine unsupported on this client browser profile.");
+                    isAlwaysListening = false;
+                    return;
+                }
                 
                 if (!recognition) { recognition = new SpeechRecognition(); }
                 
-                // Optimized configuration parameters for high speed
                 recognition.continuous = true;
                 recognition.interimResults = false;
-                recognition.lang = document.getElementById('jarvis-lang-select').value;
+                
+                // 🌐 Dynamic Voice Input Selection
+                const selectedLang = document.getElementById('jarvis-lang-select').value;
+                recognition.lang = selectedLang;
 
                 onlineBtn.textContent = "Always Online: ACTIVE";
                 onlineBtn.style.background = "#2ecc71"; 
-                currentInput.placeholder = "Listening active...";
+                currentInput.placeholder = "Listening live...";
 
                 recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                recognition.onerror = () => { if (isAlwaysListening) { setTimeout(() => { try { recognition.start(); } catch(e){} }, 10); } };
+                recognition.onerror = (e) => { 
+                    if (isAlwaysListening && e.error !== 'not-allowed') { 
+                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); 
+                    } 
+                };
                 
                 recognition.onresult = (event) => {
                     const currentResultIndex = event.resultIndex;
                     if (event.results && event.results[currentResultIndex]) {
                         const spokenText = event.results[currentResultIndex][0].transcript.trim();
+                        console.log("Jarvis captured: ", spokenText);
                         processVoiceMatrix(spokenText);
                     }
                 };
+
                 try { recognition.start(); } catch(e) {}
             }
         };
 
-        window.changeJarvisLanguage = () => { if (isAlwaysListening && recognition) { recognition.stop(); } };
+        window.changeJarvisLanguage = () => {
+            if (isAlwaysListening && recognition) {
+                recognition.stop(); // Restarts seamlessly via .onend with new lang settings
+            }
+        };
 
+        window.startVoiceInput = () => {
+            if (isAlwaysListening) return; 
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SpeechRecognition) return alert("Speech recognition unavailable.");
+            const recog = new SpeechRecognition(); 
+            recog.lang = document.getElementById('jarvis-lang-select').value;
+            recog.onstart = () => { document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; };
+            recog.onend = () => { document.getElementById("jarvis-mic-btn").style.background = "linear-gradient(135deg,#667eea,#764ba2)"; };
+            recog.onresult = e => { document.getElementById('jarvis-input').value = e.results[0][0].transcript; window.sendJarvisCommand(); };
+            recog.start();
+        };
+
+        // ====================== 🧠 PASSIVE WAKE-WORD & DUAL-BRAIN MATRIX ======================
         async function processVoiceMatrix(rawText) {
             const norm = rawText.toLowerCase();
             if (rawText.length < 2) return; 
             
             const hasWakeWord = norm.startsWith("hey jarvis") || norm.startsWith("jarvis") || 
                                 norm.startsWith("hey jogi") || norm.startsWith("jogi") || 
-                                norm.startsWith("hey shree") || norm.startsWith("shree");
+                                norm.startsWith("hey shree") || norm.startsWith("shree") ||
+                                norm.includes("जार्विस") || norm.includes("जोगी");
             
             if (hasWakeWord) {
-                let cleanCommand = norm.replace("hey jarvis","").replace("hey shree","").replace("jarvis","").replace("shree","").replace("hey jogi","").replace("jogi","").trim();
+                let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").replace("hey jogi", "").replace("jogi", "").trim();
                 document.getElementById('jarvis-input').value = rawText;
 
                 if (!cleanCommand) {
-                    await jarvisSpeak("Yes, sir.");
+                    await jarvisSpeak("Yes, sir? I am listening.");
                     return;
                 }
 
-                // Local Device Matrix Control
                 const isOff = cleanCommand.includes("off") || cleanCommand.includes("stop") || cleanCommand.includes("बंद");
                 const isOn = cleanCommand.includes("on") || cleanCommand.includes("start") || cleanCommand.includes("चालू");
                 
-                if ((cleanCommand.includes("bulb") || cleanCommand.includes("light") || cleanCommand.includes("fan") || cleanCommand.includes("पंखा")) && (isOn || isOff)) {
+                if ((cleanCommand.includes("bulb") || cleanCommand.includes("light") || cleanCommand.includes("fan") || cleanCommand.includes("बिजली") || cleanCommand.includes("पंखा")) && (isOn || isOff)) {
                     let target = userDevicesList[0] || { roomId: "chintubedroom", deviceId: "chintubedroom" };
                     let updates = {};
-                    if (cleanCommand.includes("1")) updates["bulb1"] = isOn;
-                    else if (cleanCommand.includes("2")) updates["bulb2"] = isOn;
-                    else { updates["bulb1"] = isOn; }
-                    
-                    if (cleanCommand.includes("fan") || cleanCommand.includes("पंखा")) updates["fanSpeed"] = isOn ? 3 : 0;
+                    let phraseDetail = "appliances";
+
+                    if (cleanCommand.includes("1") || cleanCommand.includes("एक")) { updates["bulb1"] = isOn; phraseDetail = "bulb 1"; }
+                    else if (cleanCommand.includes("2") || cleanCommand.includes("दो")) { updates["bulb2"] = isOn; phraseDetail = "bulb 2"; }
+                    else { updates["bulb1"] = isOn; updates["bulb2"] = isOn; } 
+
+                    if (cleanCommand.includes("fan") || cleanCommand.includes("पंखा")) {
+                        updates["fanSpeed"] = isOn ? 3 : 0;
+                        phraseDetail = "fan state";
+                    }
 
                     try {
                         await update(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states`), updates);
-                        await jarvisSpeak("Done.");
+                        await jarvisSpeak("Done, sir.");
                         document.getElementById('jarvis-input').value = "";
-                    } catch(e) {}
+                    } catch(err) {
+                        await jarvisSpeak("Sync fault.");
+                    }
                     return;
                 }
 
-                if (!GLOBAL_SYSTEM_AI_KEY) return;
+                if (!GLOBAL_SYSTEM_AI_KEY) {
+                    await jarvisSpeak("Missing API core configuration key, sir.");
+                    return;
+                }
 
-                // Fast Request Stream Processing Pipeline
                 try {
                     const response = await fetch(RENDER_BACKEND_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            command: cleanCommand + " (Respond in 1 short sentence max style)", 
-                            key: GLOBAL_SYSTEM_AI_KEY.trim() 
-                        })
+                        body: JSON.stringify({ command: cleanCommand, key: GLOBAL_SYSTEM_AI_KEY.trim() })
                     });
+                    
                     const data = await response.json();
                     if (data.reply) {
                         await jarvisSpeak(data.reply);
                         document.getElementById('jarvis-input').value = ""; 
                     }
-                } catch (err) {}
+                } catch (err) {
+                    console.error(err);
+                }
             }
         }
 
-        window.sendJarvisCommand = () => { processVoiceMatrix("Jarvis " + document.getElementById('jarvis-input').value.trim()); };
-        window.toggleJarvisWizard = (show) => {
-            document.getElementById('jarvis-panel').style.display = show ? 'block' : 'none';
-            document.getElementById('jarvis-orb').style.display = show ? 'none' : 'flex';
+        window.sendJarvisCommand = () => {
+            const rawInput = document.getElementById('jarvis-input');
+            processVoiceMatrix("Jarvis " + rawInput.value.trim()); 
         };
-        window.activateJarvisWizard = () => { document.getElementById('jarvis-wizard-container').style.display = 'block'; window.toggleJarvisWizard(true); };
-        window.turnOffJarvisWizard = () => { document.getElementById('jarvis-wizard-container').style.display = 'none'; if (isAlwaysListening) window.toggleAlwaysOnlineListening(); };
+
+        window.toggleJarvisWizard = (show) => {
+            const panel = document.getElementById('jarvis-panel');
+            const orb = document.getElementById('jarvis-orb');
+            if (show) { panel.style.display = 'block'; orb.style.display = 'none'; } 
+            else { panel.style.display = 'none'; orb.style.display = 'flex'; }
+        };
+
+        window.activateJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'block';
+            window.toggleJarvisWizard(true);
+            document.getElementById('re-enable-jarvis-btn').style.display = 'none';
+        };
+
+        window.turnOffJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'none';
+            document.getElementById('re-enable-jarvis-btn').style.display = 'inline-block';
+            if (isAlwaysListening) window.toggleAlwaysOnlineListening();
+        };
     </script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -383,42 +460,65 @@
         
         .security-lockbox { background:#f1f3f5; border: 2px solid #dee2e6; border-radius:14px; padding:15px; margin-bottom:25px; display:flex; gap:12px; align-items:center; }
         .security-lockbox input { flex:1; padding:12px; border:1px solid #ced4da; border-radius:10px; font-size:15px; letter-spacing: 2px; font-weight: bold; background: #ffffff; color: #495057; }
-        .security-lockbox button { padding:12px 24px; background:#495057; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; }
+        .security-lockbox button { padding:12px 24px; background:#495057; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; transition: background 0.2s, transform 0.1s; }
+        .security-lockbox button:hover { background: #343a40; }
+        .security-lockbox .btn-unlock { background:#e74c3c; }
+        .security-lockbox .btn-unlock:hover { background:#c0392b; }
         
         #add-device-btn { width:auto; padding:14px 30px; display:inline-block; margin-bottom:20px; margin-right:10px; }
+        #re-enable-jarvis-btn { width:auto; padding:14px 30px; display:none; margin-bottom:20px; background:linear-gradient(135deg, #11998e, #38ef7d); }
         #device-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; margin-top:20px; }
         .room-card { background:#f8f9fa; border-radius:15px; padding:25px; text-align:center; box-shadow:0 8px 25px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }
         .room-header { margin-bottom:15px; display: flex; justify-content: space-between; align-items: center; }
+        .room-header h3 { color:#2c3e50; font-size:1.2em; }
         .online-indicator { width:16px; height:16px; border-radius:50%; background:#e74c3c; }
         .online-indicator.online { background:#2ecc71; box-shadow:0 0 10px #2ecc71; }
-        .btn-control { background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:12px 30px; border:none; border-radius:12px; cursor:pointer; width:100%; font-weight: bold; }
+        .btn-control { background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:12px 30px; border:none; border-radius:12px; cursor:pointer; width:100%; margin:10px 0; font-weight: bold; }
+        .btn-remove { background:none; color:#e74c3c; padding:8px 16px; border:1px solid #e74c3c; border-radius:8px; cursor:pointer; font-size:13px; }
         #back-btn { background:#6c757d; color:white; padding:10px 20px; border:none; border-radius:8px; color:white; cursor:pointer; margin-bottom:20px; display:none; font-weight: bold; }
         #control-panel { display:none; background:#f8f9fa; padding:30px; border-radius:15px; border: 1px solid #e9ecef; }
         #control-title { text-align:center; color:#2c3e50; font-size:1.9em; margin-bottom:20px; }
         .bulbs-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:20px; margin:30px 0; }
         .bulb-card { background:white; border-radius:15px; padding:20px; text-align:center; cursor:pointer; border:2px solid #e9ecef; }
         .bulb-card.active { background:linear-gradient(135deg,#ffd89b,#19547b); color:white; border-color:#ffd89b; }
+        .bulb-icon { font-size:2em; margin-bottom:10px; }
         .status { font-weight:bold; font-size:1.2em; margin-top: 5px; }
+        .fan-control { background:white; border-radius:15px; padding:30px; text-align:center; margin-top:20px; border: 1px solid #e9ecef; }
+        .speed-buttons { display:flex; justify-content:center; gap:15px; flex-wrap:wrap; margin:20px 0; }
+        .fan-control button { padding:14px 32px; border:none; border-radius:30px; background:#e9ecef; color:#495057; font-weight:bold; cursor:pointer; }
+        .fan-control button.active { background:linear-gradient(135deg,#667eea,#764ba2); color:white; transform:scale(1.05); }
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:2000; }
         .modal-content { background:white; padding:35px; border-radius:15px; width:90%; max-width:420px; text-align:center; }
         
         .jarvis-wizard-wrapper { position: fixed; bottom: 30px; right: 30px; z-index: 5000; }
-        .jarvis-orb { width: 65px; height: 65px; border-radius: 50%; background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: pointer; animation: floatingPulse 2s infinite ease-in-out; }
+        .jarvis-orb { width: 65px; height: 65px; border-radius: 50%; background: radial-gradient(circle, #00d2ff 0%, #0066ff 100%); box-shadow: 0 8px 32px rgba(0, 102, 255, 0.4), inset 0 0 15px rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: move; transition: transform 0.2s ease; animation: floatingPulse 2s infinite ease-in-out; }
+        
         .jarvis-panel { display: block; width: 340px; background: rgba(23, 32, 42, 0.96); border: 2px solid #00d2ff; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
-        .jarvis-panel-header { background: linear-gradient(135deg, #1c2833, #2c3e50); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; }
+        .jarvis-panel-header { background: linear-gradient(135deg, #1c2833, #2c3e50); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: move; }
+        .jarvis-panel-header h4 { color: #00d2ff; font-weight: bold; font-size: 1rem; display:flex; align-items:center; gap: 6px;}
+        .jarvis-panel-actions { display: flex; gap: 8px; }
+        .jarvis-panel-actions button { background: none; border: none; color: #bdc3c7; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+        .jarvis-panel-actions .power-off:hover { color: #e74c3c; }
         .jarvis-panel-body { padding: 15px; }
         .jarvis-input-group { display: flex; align-items: center; gap: 8px; background: #111a24; padding: 6px 12px; border-radius: 30px; border: 1px solid #34495e; }
-        .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; }
+        
+        .jarvis-input-group input { flex: 1; background: none; border: none; color: white; padding: 8px 0; font-size: 0.95rem; pointer-events: auto; }
         .jarvis-input-group input:focus { outline: none; }
-        .jarvis-always-online-action { display: block; width: 100%; margin-top: 12px; padding: 10px; border: none; border-radius: 12px; background: linear-gradient(135deg, #0072ff, #00c6ff); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-align: center; }
+        
+        .jarvis-action-btn { width: 38px; height: 38px; border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+        .mic-btn { background: linear-gradient(135deg,#667eea,#764ba2); }
+        .send-btn { background: linear-gradient(135deg,#00c6ff,#0072ff); }
+        
+        .jarvis-always-online-action { display: block; width: 100%; margin-top: 12px; padding: 10px; border: none; border-radius: 12px; background: linear-gradient(135deg, #0072ff, #00c6ff); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-align: center; box-shadow: 0 4px 15px rgba(0,114,255,0.2); transition: transform 0.1s; }
+        .jarvis-always-online-action:active { transform: scale(0.98); }
+        
         @keyframes floatingPulse { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="auth-container" id="auth-container">
-        <div class="header"><h1>Smart Home</h1></div>
+        <div class="header"><h1>Smart Home</h1><p>Multi-Room Control Hub</p></div>
         <div class="form-container" id="login-form">
             <div class="error-message" id="login-error"></div>
             <div class="form-group"><input type="email" id="login-email" placeholder="Email Address"></div>
@@ -438,23 +538,39 @@
 
     <div class="app-container" id="app-container" style="display:none;">
         <div class="app-header">
-            <div><h1>Smart Home Control</h1><p>User: <span id="user-name" style="color: #ffd89b;"></span></p></div>
+            <div><h1>Smart Home Control</h1><p>Welcome back, <span id="user-name" style="font-weight: bold; color: #ffd89b;"></span></p></div>
             <button type="button" class="logout-btn" onclick="logout()">Logout</button>
         </div>
         <div class="controls">
+            
             <div class="security-lockbox">
-                🔒 Global AI Core: <input type="password" id="dashboard-gemini-key">
-                <button type="button" id="unlock-key-btn" onclick="window.unlockKeyField()">Unlock</button>
-                <button type="button" id="sync-key-btn" onclick="window.saveSystemKey()">Sync</button>
+                🔒 Global AI Core: <input type="password" id="dashboard-gemini-key" placeholder="Awaiting Central Deployment...">
+                <button type="button" id="unlock-key-btn" class="btn-unlock" onclick="window.unlockKeyField()">Modify Core</button>
+                <button type="button" id="sync-key-btn" onclick="window.saveSystemKey()">Sync Globally</button>
             </div>
-            <button type="button" class="btn" id="add-device-btn">+ Add Node</button>
-            <button type="button" id="back-btn" onclick="goBack()">← Back</button>
+
+            <button type="button" class="btn" id="add-device-btn">+ Add Room & Device Target</button>
+            <button type="button" class="btn" id="re-enable-jarvis-btn" onclick="window.activateJarvisWizard()">⚡ Turn On Jarvis Wizard</button>
+            <button type="button" id="back-btn" onclick="goBack()">← Back to Device List</button>
             <div id="device-list"></div>
+            
             <div id="control-panel">
-                <h2 id="control-title">Select device</h2>
+                <h2 id="control-title">Select a device</h2>
                 <div class="bulbs-grid">
-                    <div class="bulb-card" onclick="toggleBulb(1)"><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
-                    <div class="bulb-card" onclick="toggleBulb(2)"><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(1)"><div class="bulb-icon">💡</div><h3>Bulb 1</h3><div class="status" id="bulb1-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(2)"><div class="bulb-icon">💡</div><h3>Bulb 2</h3><div class="status" id="bulb2-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(3)"><div class="bulb-icon">💡</div><h3>Bulb 3</h3><div class="status" id="bulb3-status">OFF</div></div>
+                    <div class="bulb-card" onclick="toggleBulb(4)"><div class="bulb-icon">💡</div><h3>Bulb 4</h3><div class="status" id="bulb4-status">OFF</div></div>
+                </div>
+                <div class="fan-control">
+                    <h3>Fan Speed Regulator</h3>
+                    <div class="speed-buttons">
+                        <button type="button" onclick="setFanSpeed(0)">OFF</button>
+                        <button type="button" onclick="setFanSpeed(1)">LOW</button>
+                        <button type="button" onclick="setFanSpeed(2)">MED</button>
+                        <button type="button" onclick="setFanSpeed(3)">HIGH</button>
+                    </div>
+                    <div class="status" id="fan-status">Current: OFF</div>
                 </div>
             </div>
         </div>
@@ -463,32 +579,38 @@
 
 <div id="modal">
     <div class="modal-content">
-        <h2>Add Target</h2>
-        <div class="form-group"><input type="text" id="room-id" placeholder="Room ID"></div>
-        <div class="form-group"><input type="text" id="device-id" placeholder="Device ID"></div>
-        <button type="button" class="btn" onclick="addDevice()">Connect</button>
-        <button type="button" class="btn" style="background:#6c757d;" id="close-modal">Cancel</button>
+        <h2>Add New Smart Node</h2>
+        <div class="form-group"><input type="text" id="room-id" placeholder="Room ID (e.g., chintubedroom)"></div>
+        <div class="form-group"><input type="text" id="device-id" placeholder="Device Node ID (e.g., chintubedroom)"></div>
+        <button type="button" class="btn" onclick="addDevice()">Save and Connect</button>
+        <button type="button" class="btn" style="background:#6c757d; margin-top:10px;" id="close-modal">Cancel</button>
     </div>
 </div>
 
 <div class="jarvis-wizard-wrapper" id="jarvis-wizard-container" style="display:none;">
     <div class="jarvis-orb" id="jarvis-orb" onclick="window.toggleJarvisWizard(true)">🤖</div>
     <div class="jarvis-panel" id="jarvis-panel">
-        <div class="jarvis-panel-header">
+        <div class="jarvis-panel-header" id="jarvis-drag-header">
             <h4>🔵 Jarvis Smart Core</h4>
-            <button type="button" style="color:white; background:none; border:none;" onclick="window.toggleJarvisWizard(false)">−</button>
+            <div class="jarvis-panel-actions">
+                <button type="button" onclick="window.toggleJarvisWizard(false)">−</button>
+                <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()">✕</button>
+            </div>
         </div>
         <div class="jarvis-panel-body">
-            <div style="margin-bottom: 12px; display: flex; justify-content: space-between; color: #00d2ff; font-size: 0.85rem;">
-                <span>🗣️ Language:</span>
-                <select id="jarvis-lang-select" onchange="window.changeJarvisLanguage()" style="background: #111a24; color: white; border: 1px solid #34495e;">
+            <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; color: #00d2ff; font-size: 0.85rem; font-weight: bold; padding: 0 4px;">
+                <span>🗣️ Voice Target:</span>
+                <select id="jarvis-lang-select" onchange="window.changeJarvisLanguage()" style="background: #111a24; color: white; border: 1px solid #34495e; padding: 4px 8px; border-radius: 8px; font-weight: bold; cursor: pointer; outline: none;">
                     <option value="en-US">English (US)</option>
                     <option value="hi-IN">Hindi (हिन्दी)</option>
                     <option value="or-IN">Odia (ଓଡ଼ିଆ)</option>
                 </select>
             </div>
+
             <div class="jarvis-input-group">
-                <input type="text" id="jarvis-input" placeholder="Listening live...">
+                <input type="text" id="jarvis-input" placeholder="Ask Jarvis Anything...">
+                <button type="button" class="jarvis-action-btn mic-btn" id="jarvis-mic-btn" onclick="window.startVoiceInput()">🎤</button>
+                <button type="button" class="jarvis-action-btn send-btn" onclick="window.sendJarvisCommand()">➤</button>
             </div>
             <button type="button" class="jarvis-always-online-action" id="jarvis-always-online-btn" onclick="window.toggleAlwaysOnlineListening()">Go Always Online</button>
         </div>
