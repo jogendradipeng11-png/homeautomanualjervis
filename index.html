@@ -228,7 +228,216 @@
 
         window.removeDevice = (id) => { if (confirm("Remove this device from your list?")) remove(ref(db, `users/${currentUser.uid}/devices/${id}`)); };
 
-       function jarvisSpeak(text
+        // ====================== 🔊 AUDIO TTS ENGINE CONTROL LAYER ======================
+        function jarvisSpeak(text) {
+            return new Promise((resolve) => {
+                if (!window.speechSynthesis) { resolve(); return; }
+                
+                // 🔒 Lock Microphone temporarily to avoid echo loops
+                if (recognition) { 
+                    recognition.onend = null; 
+                    recognition.stop(); 
+                }
+                
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // 🌐 Dynamic Audio Output Matching
+                const selectedLang = document.getElementById('jarvis-lang-select').value;
+                utterance.lang = selectedLang; 
+                utterance.rate = 1.1; // Slightly faster for an active, human feel
+                utterance.pitch = 0.95;
+                
+                utterance.onend = () => {
+                    // 🔓 Re-open Microphone IMMEDIATELY to listen for your next command
+                    if (isAlwaysListening && recognition) { 
+                        recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 50); 
+                    }
+                    resolve();
+                };
+                
+                utterance.onerror = () => {
+                    if (isAlwaysListening && recognition) { 
+                        recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 50); 
+                    }
+                    resolve();
+                };
+                
+                window.speechSynthesis.speak(utterance);
+            });
+        }
+
+        // ====================== 🔄 ALWAYS ONLINE TOGGLE INTERACTION FUNCTION ======================
+        window.toggleAlwaysOnlineListening = () => {
+            const onlineBtn = document.getElementById("jarvis-always-online-btn");
+            const currentInput = document.getElementById('jarvis-input');
+
+            if (isAlwaysListening) {
+                isAlwaysListening = false;
+                if (recognition) { 
+                    recognition.onend = null; 
+                    recognition.onerror = null;
+                    recognition.onresult = null;
+                    recognition.stop(); 
+                }
+                onlineBtn.textContent = "Go Always Online";
+                onlineBtn.style.background = "linear-gradient(135deg, #0072ff, #00c6ff)";
+                currentInput.placeholder = "Ask Jarvis Anything...";
+            } else {
+                isAlwaysListening = true;
+                
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert("Speech recognition engine unsupported on this client browser profile.");
+                    isAlwaysListening = false;
+                    return;
+                }
+                
+                if (!recognition) { recognition = new SpeechRecognition(); }
+                
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                
+                // 🌐 Dynamic Voice Input Selection
+                const selectedLang = document.getElementById('jarvis-lang-select').value;
+                recognition.lang = selectedLang;
+
+                onlineBtn.textContent = "Always Online: ACTIVE";
+                onlineBtn.style.background = "#2ecc71"; 
+                currentInput.placeholder = "Listening live...";
+
+                recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
+                recognition.onerror = (e) => { 
+                    if (isAlwaysListening && e.error !== 'not-allowed') { 
+                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); 
+                    } 
+                };
+                
+                recognition.onresult = (event) => {
+                    const currentResultIndex = event.resultIndex;
+                    if (event.results && event.results[currentResultIndex]) {
+                        const spokenText = event.results[currentResultIndex][0].transcript.trim();
+                        console.log("Jarvis captured: ", spokenText);
+                        processVoiceMatrix(spokenText);
+                    }
+                };
+
+                try { recognition.start(); } catch(e) {}
+            }
+        };
+
+        window.changeJarvisLanguage = () => {
+            if (isAlwaysListening && recognition) {
+                recognition.stop(); // Restarts seamlessly via .onend with new lang settings
+            }
+        };
+
+        window.startVoiceInput = () => {
+            if (isAlwaysListening) return; 
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SpeechRecognition) return alert("Speech recognition unavailable.");
+            const recog = new SpeechRecognition(); 
+            recog.lang = document.getElementById('jarvis-lang-select').value;
+            recog.onstart = () => { document.getElementById("jarvis-mic-btn").style.background = "#e74c3c"; };
+            recog.onend = () => { document.getElementById("jarvis-mic-btn").style.background = "linear-gradient(135deg,#667eea,#764ba2)"; };
+            recog.onresult = e => { document.getElementById('jarvis-input').value = e.results[0][0].transcript; window.sendJarvisCommand(); };
+            recog.start();
+        };
+
+        // ====================== 🧠 PASSIVE WAKE-WORD & DUAL-BRAIN MATRIX ======================
+        async function processVoiceMatrix(rawText) {
+            const norm = rawText.toLowerCase();
+            if (rawText.length < 2) return; 
+            
+            const hasWakeWord = norm.startsWith("hey jarvis") || norm.startsWith("jarvis") || 
+                                norm.startsWith("hey jogi") || norm.startsWith("jogi") || 
+                                norm.startsWith("hey shree") || norm.startsWith("shree") ||
+                                norm.includes("जार्विस") || norm.includes("जोगी");
+            
+            if (hasWakeWord) {
+                let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").replace("hey jogi", "").replace("jogi", "").trim();
+                document.getElementById('jarvis-input').value = rawText;
+
+                if (!cleanCommand) {
+                    await jarvisSpeak("Yes, sir? I am listening.");
+                    return;
+                }
+
+                const isOff = cleanCommand.includes("off") || cleanCommand.includes("stop") || cleanCommand.includes("बंद");
+                const isOn = cleanCommand.includes("on") || cleanCommand.includes("start") || cleanCommand.includes("चालू");
+                
+                if ((cleanCommand.includes("bulb") || cleanCommand.includes("light") || cleanCommand.includes("fan") || cleanCommand.includes("बिजली") || cleanCommand.includes("पंखा")) && (isOn || isOff)) {
+                    let target = userDevicesList[0] || { roomId: "chintubedroom", deviceId: "chintubedroom" };
+                    let updates = {};
+                    let phraseDetail = "appliances";
+
+                    if (cleanCommand.includes("1") || cleanCommand.includes("एक")) { updates["bulb1"] = isOn; phraseDetail = "bulb 1"; }
+                    else if (cleanCommand.includes("2") || cleanCommand.includes("दो")) { updates["bulb2"] = isOn; phraseDetail = "bulb 2"; }
+                    else { updates["bulb1"] = isOn; updates["bulb2"] = isOn; } 
+
+                    if (cleanCommand.includes("fan") || cleanCommand.includes("पंखा")) {
+                        updates["fanSpeed"] = isOn ? 3 : 0;
+                        phraseDetail = "fan state";
+                    }
+
+                    try {
+                        await update(ref(db, `rooms/${target.roomId}/devices/${target.deviceId}/states`), updates);
+                        await jarvisSpeak("Done, sir.");
+                        document.getElementById('jarvis-input').value = "";
+                    } catch(err) {
+                        await jarvisSpeak("Sync fault.");
+                    }
+                    return;
+                }
+
+                if (!GLOBAL_SYSTEM_AI_KEY) {
+                    await jarvisSpeak("Missing API core configuration key, sir.");
+                    return;
+                }
+
+                try {
+                    const response = await fetch(RENDER_BACKEND_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: cleanCommand, key: GLOBAL_SYSTEM_AI_KEY.trim() })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.reply) {
+                        await jarvisSpeak(data.reply);
+                        document.getElementById('jarvis-input').value = ""; 
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+        }
+
+        window.sendJarvisCommand = () => {
+            const rawInput = document.getElementById('jarvis-input');
+            processVoiceMatrix("Jarvis " + rawInput.value.trim()); 
+        };
+
+        window.toggleJarvisWizard = (show) => {
+            const panel = document.getElementById('jarvis-panel');
+            const orb = document.getElementById('jarvis-orb');
+            if (show) { panel.style.display = 'block'; orb.style.display = 'none'; } 
+            else { panel.style.display = 'none'; orb.style.display = 'flex'; }
+        };
+
+        window.activateJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'block';
+            window.toggleJarvisWizard(true);
+            document.getElementById('re-enable-jarvis-btn').style.display = 'none';
+        };
+
+        window.turnOffJarvisWizard = () => {
+            document.getElementById('jarvis-wizard-container').style.display = 'none';
+            document.getElementById('re-enable-jarvis-btn').style.display = 'inline-block';
+            if (isAlwaysListening) window.toggleAlwaysOnlineListening();
+        };
     </script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -388,8 +597,7 @@
                 <button type="button" class="power-off" onclick="window.turnOffJarvisWizard()">✕</button>
             </div>
         </div>
-<div class="jarvis-panel-body">
-            <!-- 🌐 LANGUAGE CHANGER SELECTION MATRIX -->
+        <div class="jarvis-panel-body">
             <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; color: #00d2ff; font-size: 0.85rem; font-weight: bold; padding: 0 4px;">
                 <span>🗣️ Voice Target:</span>
                 <select id="jarvis-lang-select" onchange="window.changeJarvisLanguage()" style="background: #111a24; color: white; border: 1px solid #34495e; padding: 4px 8px; border-radius: 8px; font-weight: bold; cursor: pointer; outline: none;">
