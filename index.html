@@ -28,6 +28,8 @@
         let GLOBAL_SYSTEM_AI_KEY = ""; 
         let recognition = null;
         let isAlwaysListening = false;
+        // 🔒 System Conversation Workflow Toggle State
+        let isJarvisPassiveStandby = false;
 
         const ADMIN_EMAIL = "jogendra.dipeng11@gmail.com"; 
         const ADMIN_UID_PATH = "master_admin_global_core";
@@ -69,6 +71,7 @@
                 userDevicesList = [];
                 GLOBAL_SYSTEM_AI_KEY = "";
                 isAlwaysListening = false;
+                isJarvisPassiveStandby = false;
                 if(recognition) { recognition.abort(); }
                 document.getElementById('auth-container').style.display = 'block';
                 document.getElementById('app-container').style.display = 'none';
@@ -233,7 +236,7 @@
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) { resolve(); return; }
                 
-                // 🔒 Lock Microphone temporarily to avoid echo loops
+                // 🔒 Lock Microphone temporarily to avoid capture eco loops while speaking
                 if (recognition) { 
                     recognition.onend = null; 
                     recognition.stop(); 
@@ -242,17 +245,16 @@
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 
-                // 🌐 Dynamic Audio Output Matching
                 const selectedLang = document.getElementById('jarvis-lang-select').value;
                 utterance.lang = selectedLang; 
-                utterance.rate = 1.1; // Slightly faster for an active, human feel
+                utterance.rate = 1.15; // Human conversation fluid pacing
                 utterance.pitch = 0.95;
                 
                 utterance.onend = () => {
-                    // 🔓 Re-open Microphone IMMEDIATELY to listen for your next command
+                    // 🔓 Re-open Microphone pipeline 10ms after finishing response stream
                     if (isAlwaysListening && recognition) { 
                         recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 50); 
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 10); 
                     }
                     resolve();
                 };
@@ -260,7 +262,7 @@
                 utterance.onerror = () => {
                     if (isAlwaysListening && recognition) { 
                         recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
-                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 50); 
+                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 10); 
                     }
                     resolve();
                 };
@@ -276,6 +278,7 @@
 
             if (isAlwaysListening) {
                 isAlwaysListening = false;
+                isJarvisPassiveStandby = false;
                 if (recognition) { 
                     recognition.onend = null; 
                     recognition.onerror = null;
@@ -287,6 +290,7 @@
                 currentInput.placeholder = "Ask Jarvis Anything...";
             } else {
                 isAlwaysListening = true;
+                isJarvisPassiveStandby = false;
                 
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
@@ -300,18 +304,17 @@
                 recognition.continuous = true;
                 recognition.interimResults = false;
                 
-                // 🌐 Dynamic Voice Input Selection
                 const selectedLang = document.getElementById('jarvis-lang-select').value;
                 recognition.lang = selectedLang;
 
                 onlineBtn.textContent = "Always Online: ACTIVE";
                 onlineBtn.style.background = "#2ecc71"; 
-                currentInput.placeholder = "Listening live...";
+                currentInput.placeholder = "Listening live for wake words...";
 
                 recognition.onend = () => { if (isAlwaysListening) { try { recognition.start(); } catch(e){} } };
                 recognition.onerror = (e) => { 
                     if (isAlwaysListening && e.error !== 'not-allowed') { 
-                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 50); 
+                        setTimeout(() => { try { recognition.start(); } catch(err){} }, 10); 
                     } 
                 };
                 
@@ -319,7 +322,6 @@
                     const currentResultIndex = event.resultIndex;
                     if (event.results && event.results[currentResultIndex]) {
                         const spokenText = event.results[currentResultIndex][0].transcript.trim();
-                        console.log("Jarvis captured: ", spokenText);
                         processVoiceMatrix(spokenText);
                     }
                 };
@@ -330,7 +332,7 @@
 
         window.changeJarvisLanguage = () => {
             if (isAlwaysListening && recognition) {
-                recognition.stop(); // Restarts seamlessly via .onend with new lang settings
+                recognition.stop(); 
             }
         };
 
@@ -351,20 +353,37 @@
             const norm = rawText.toLowerCase();
             if (rawText.length < 2) return; 
             
+            // 🛑 Dynamic Listening Interceptor: Check for Stop requests across all targeted languages
+            if (norm.includes("stop please") || norm.includes("रुको") || norm.includes("please stop") || norm.includes("ଚୁପ୍ କର")) {
+                window.speechSynthesis.cancel(); // Drop speech immediately
+                isJarvisPassiveStandby = true;   // Enter sleep monitoring loop
+                document.getElementById('jarvis-input').value = "[Standby Mode: Waiting for Wake Word]";
+                document.getElementById('jarvis-input').placeholder = "Sleeping. Say Wake Phrase to awaken core...";
+                return;
+            }
+
+            // Check if the stream contains a wake command pattern
             const hasWakeWord = norm.startsWith("hey jarvis") || norm.startsWith("jarvis") || 
                                 norm.startsWith("hey jogi") || norm.startsWith("jogi") || 
                                 norm.startsWith("hey shree") || norm.startsWith("shree") ||
                                 norm.includes("जार्विस") || norm.includes("जोगी");
             
             if (hasWakeWord) {
+                // If we were sleeping, wake back up instantly upon hearing the wake word
+                if (isJarvisPassiveStandby) {
+                    isJarvisPassiveStandby = false;
+                    document.getElementById('jarvis-input').placeholder = "Listening live...";
+                }
+
                 let cleanCommand = norm.replace("hey jarvis", "").replace("hey shree", "").replace("jarvis", "").replace("shree", "").replace("hey jogi", "").replace("jogi", "").trim();
                 document.getElementById('jarvis-input').value = rawText;
 
                 if (!cleanCommand) {
-                    await jarvisSpeak("Yes, sir? I am listening.");
+                    await jarvisSpeak("I am listening, sir.");
                     return;
                 }
 
+                // Local Device Hardware Management Matrix 
                 const isOff = cleanCommand.includes("off") || cleanCommand.includes("stop") || cleanCommand.includes("बंद");
                 const isOn = cleanCommand.includes("on") || cleanCommand.includes("start") || cleanCommand.includes("चालू");
                 
@@ -392,16 +411,20 @@
                     return;
                 }
 
+                // Cloud Processing Interceptor Gateway
                 if (!GLOBAL_SYSTEM_AI_KEY) {
                     await jarvisSpeak("Missing API core configuration key, sir.");
                     return;
                 }
 
                 try {
+                    // Injecting clean runtime constraints to keep responses fast and conversation-focused
+                    const optimizedQuery = cleanCommand + " (CRITICAL: Respond in 1 short sentence max style)";
+                    
                     const response = await fetch(RENDER_BACKEND_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ command: cleanCommand, key: GLOBAL_SYSTEM_AI_KEY.trim() })
+                        body: JSON.stringify({ command: optimizedQuery, key: GLOBAL_SYSTEM_AI_KEY.trim() })
                     });
                     
                     const data = await response.json();
@@ -411,6 +434,26 @@
                     }
                 } catch (err) {
                     console.error(err);
+                }
+            } else {
+                // 🛑 If system is in Standby mode and no wake word is found, reject background chatter
+                if (isJarvisPassiveStandby) {
+                    return;
+                }
+                
+                // Conversational Loop: If the user didn't explicitly say the wake word but we are active, process as an ongoing chat sequence
+                if (norm.length > 3 && isAlwaysListening && !window.speechSynthesis.speaking) {
+                    try {
+                        const response = await fetch(RENDER_BACKEND_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command: rawText + " (CRITICAL: Respond in 1 short sentence max style)", key: GLOBAL_SYSTEM_AI_KEY.trim() })
+                        });
+                        const data = await response.json();
+                        if (data.reply) {
+                            await jarvisSpeak(data.reply);
+                        }
+                    } catch(e){}
                 }
             }
         }
